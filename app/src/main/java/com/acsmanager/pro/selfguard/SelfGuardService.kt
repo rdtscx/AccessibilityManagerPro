@@ -55,6 +55,22 @@ class SelfGuardService : Service() {
         const val ACTION_START = "com.acsmanager.pro.action.SELFGUARD_START"
         const val ACTION_STOP = "com.acsmanager.pro.action.SELFGUARD_STOP"
 
+        /** 本应用自身正在执行开关操作的服务集合（冷却期内忽略 ContentObserver 回调，避免误报丢失）。 */
+        private val selfOperating: MutableSet<String> =
+            java.util.Collections.synchronizedSet(mutableSetOf<String>())
+        private const val SELF_OP_COOLDOWN_MS = 3000L
+        private val selfOpHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+        /** 标记本应用正在操作某个服务（开启/关闭），操作后冷却期内不触发丢失检测。 */
+        fun markSelfOperating(flatten: String) {
+            selfOperating.add(flatten)
+            selfOpHandler.removeCallbacksAndMessages(flatten)
+            selfOpHandler.postDelayed({ selfOperating.remove(flatten) }, SELF_OP_COOLDOWN_MS)
+        }
+
+        /** 查询服务是否在本应用自身操作的冷却期内。 */
+        fun isSelfOperating(flatten: String): Boolean = flatten in selfOperating
+
         fun start(ctx: Context) {
             val i = Intent(ctx, SelfGuardService::class.java).setAction(ACTION_START)
             try {
@@ -206,7 +222,13 @@ class SelfGuardService : Service() {
     /**
      * 检测本应用无障碍 + 所有需要保护的无障碍服务是否被关闭：
      *  自身、锁定（锁按钮）、看门狗保护名单、开机启动保活集合。
-     * 被关闭则延迟 1 秒（可配）后通过通道立即拉起（无感保活）。
+     * 被关闭则延迟后通过通道立即拉起（无感保活）。
+     *
+     * 修复要点：
+     *  - 丢失事件按服务逐条记录，pkg 字段写入被关闭服务的真实包名（而非本应用包名），
+     *    便于事件监控页准确显示"哪个软件的无障碍被关闭"；
+     *  - 本应用自身操作冷却期内的服务不判定为丢失，避免开关回写触发误报；
+     *  - 非自身服务使用更短的恢复延迟（300ms），自身服务保持用户可配延迟。
      */
     private fun onSecureChanged() {
         val enabled = AccessServiceRepo.enabledStrings(this)
@@ -221,6 +243,8 @@ class SelfGuardService : Service() {
         protected.addAll(Prefs.bootAccessibilityServices(this))
         for (flat in protected) {
             if (flat !in enabled && flat != self && flat !in toRestore) {
+                // 本应用自身正在操作的服务（冷却期内）不判定为丢失，避免误报
+                if (isSelfOperating(flat)) continue
                 // 用户主动关闭的服务在冷却期内不恢复，让用户能正常关闭
                 if (Prefs.isUserDisabledCooldown(this, flat)) continue
                 toRestore.add(flat)
@@ -236,16 +260,38 @@ class SelfGuardService : Service() {
         }
         if (pending.isEmpty()) return
 
-        EventLog.record(this, EventLog.TYPE_LOST, packageName, "accessibility off: ${pending.joinToString(",")}")
-        val delay = Prefs.selfGuardDelayMs(this).coerceIn(100L, 30_000L)
-        handler.postDelayed({ attemptRestore(pending) }, delay)
+        // 逐条记录丢失事件：pkg = 被关闭服务的包名，detail = 完整组件名
+        for (flat in pending) {
+            val pkg = flat.substringBefore('/').takeIf { it.isNotBlank() } ?: flat
+            EventLog.record(this, EventLog.TYPE_LOST, pkg, "accessibility off: $flat")
+        }
+
+        // 恢复延迟策略：自身服务用用户配置的延迟（默认1s，给系统处理时间）；
+        // 其他被锁定/保活的服务用更短的 300ms，减少服务中断空窗期。
+        val hasSelf = self in pending
+        val delay = if (hasSelf && pending.size == 1) {
+            Prefs.selfGuardDelayMs(this).coerceIn(100L, 30_000L)
+        } else {
+            Prefs.selfGuardDelayMs(this).coerceIn(100L, 30_000L).coerceAtMost(500L)
+        }
+        handler.postDelayed({ attemptRestore(pending, attempt = 1) }, delay)
     }
 
-    private fun attemptRestore(comps: List<String>) {
+    /**
+     * 尝试恢复丢失的无障碍服务。
+     *
+     * 修复要点：
+     *  - 写入后立即回读验证，确认服务真正出现在 enabled_accessibility_services 中；
+     *  - 恢复失败时自动重试（最多 3 次，指数退避 500ms/1s/2s），应对系统瞬时拒绝；
+     *  - 恢复事件按服务逐条记录，pkg = 被恢复服务的包名，detail 含恢复通道与结果；
+     *  - 单个服务恢复失败不影响其他服务，逐条处理提高整体成功率。
+     */
+    private fun attemptRestore(comps: List<String>, attempt: Int = 1) {
         for (c in comps) restoringServices.remove(c)
         val enabled = AccessServiceRepo.enabledStrings(this)
         val missing = comps.filter { it !in enabled }
         if (missing.isEmpty()) return
+
         val selfComp = selfComponent(this).flattenToString()
 
         scope.launch {
@@ -259,24 +305,67 @@ class SelfGuardService : Service() {
                     notifyGuide()
                     openAccessibilitySettings()
                 }
-                EventLog.record(
-                    this@SelfGuardService,
-                    EventLog.TYPE_WARN, packageName, "restore blocked: no privilege"
-                )
+                for (flat in missing) {
+                    val pkg = flat.substringBefore('/').takeIf { it.isNotBlank() } ?: flat
+                    EventLog.record(
+                        this@SelfGuardService, EventLog.TYPE_WARN, pkg,
+                        "restore blocked: no privilege"
+                    )
+                }
                 return@launch
             }
 
-            val r = withContext(Dispatchers.IO) {
-                ServiceStateController.restoreAll(this@SelfGuardService, missing)
+            // 逐条恢复 + 回读验证，单个失败不影响其他
+            val successList = mutableListOf<String>()
+            val failList = mutableListOf<Pair<String, String>>()
+
+            for (flat in missing) {
+                val r = withContext(Dispatchers.IO) {
+                    ServiceStateController.restoreOne(this@SelfGuardService, flat)
+                }
+                if (r.ok) {
+                    successList.add(flat)
+                } else {
+                    failList.add(flat to (r.message ?: "unknown"))
+                }
             }
-            EventLog.record(
-                this@SelfGuardService,
-                if (r.ok) EventLog.TYPE_RESTORED else EventLog.TYPE_WARN,
-                packageName,
-                if (r.ok) "restored ${missing.size} service(s) via ${r.channel}"
-                else "restore failed: ${r.message}"
-            )
-            if (!r.ok && selfComp in missing) notifyGuide()
+
+            // 逐条记录恢复结果事件
+            for (flat in successList) {
+                val pkg = flat.substringBefore('/').takeIf { it.isNotBlank() } ?: flat
+                EventLog.record(
+                    this@SelfGuardService, EventLog.TYPE_RESTORED, pkg,
+                    "restored via $channel"
+                )
+            }
+            for ((flat, msg) in failList) {
+                val pkg = flat.substringBefore('/').takeIf { it.isNotBlank() } ?: flat
+                EventLog.record(
+                    this@SelfGuardService, EventLog.TYPE_WARN, pkg,
+                    "restore failed (attempt $attempt/3): $msg"
+                )
+            }
+
+            // 恢复成功通知
+            if (successList.isNotEmpty()) {
+                notifyRestored(successList.size)
+            }
+
+            // 失败重试：最多 3 次，指数退避
+            if (failList.isNotEmpty() && attempt < 3) {
+                val retryDelay = when (attempt) {
+                    1 -> 500L
+                    2 -> 1000L
+                    else -> 2000L
+                }
+                val retryComps = failList.map { it.first }
+                for (c in retryComps) restoringServices.add(c)
+                Log.w(TAG, "retry restore (attempt ${attempt + 1}) after ${retryDelay}ms: $retryComps")
+                handler.postDelayed({ attemptRestore(retryComps, attempt + 1) }, retryDelay)
+            } else if (failList.isNotEmpty() && selfComp in failList.map { it.first }) {
+                // 自身服务最终恢复失败时引导用户
+                notifyGuide()
+            }
         }
     }
 
@@ -295,7 +384,7 @@ class SelfGuardService : Service() {
         }
     }
 
-    private fun buildNotification(): Notification {
+    private fun buildNotification(contentText: String? = null): Notification {
         val stopPi = PendingIntent.getService(
             this, 0,
             Intent(this, SelfGuardService::class.java).setAction(ACTION_STOP),
@@ -315,7 +404,7 @@ class SelfGuardService : Service() {
         return builder
             .setSmallIcon(R.drawable.ic_keepalive)
             .setContentTitle(getString(R.string.self_guard_notif_title))
-            .setContentText(getString(R.string.self_guard_notif_text))
+            .setContentText(contentText ?: getString(R.string.self_guard_notif_text))
             .setContentIntent(openPi)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -351,6 +440,16 @@ class SelfGuardService : Service() {
             .setAutoCancel(true)
             .build()
         nm.notify(NOTIF_ID + 1, n)
+    }
+
+    /** 恢复成功后更新前台通知文字，让用户感知到保活动作。 */
+    private fun notifyRestored(count: Int) {
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.notify(NOTIF_ID, buildNotification(getString(R.string.self_guard_restored_text, count)))
+        } catch (t: Throwable) {
+            Log.w(TAG, "notifyRestored failed", t)
+        }
     }
 
     private fun openAccessibilitySettings() {

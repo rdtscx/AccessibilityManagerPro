@@ -124,6 +124,8 @@ class AccessibilityPermActivity : AppCompatActivity() {
         toggling.add(flat)
         // 用户主动关闭时记录冷却期，自监控在冷却期内不自动恢复
         if (!enabled) Prefs.markUserDisabled(this, flat)
+        // 标记本应用正在操作该服务（3秒冷却期），避免开关回写触发 ContentObserver 误报"丢失"
+        com.acsmanager.pro.selfguard.SelfGuardService.markSelfOperating(flat)
         val ctx = this
         scope.launch {
             val r = withContext(Dispatchers.IO) {

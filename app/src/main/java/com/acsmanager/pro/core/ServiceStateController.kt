@@ -63,7 +63,43 @@ object ServiceStateController {
             }
             if (!changed) return@withContext Result(true, Privilege.bestChannel(ctx), "no_change")
             val result = writeServices(ctx, current)
-            if (result.ok) writeAccessibilityEnabled(ctx)
+            if (result.ok) {
+                writeAccessibilityEnabled(ctx)
+                // 写入后回读验证：确认所有目标服务均已出现在 enabled 列表中
+                val verified = AccessServiceRepo.enabledStrings(ctx)
+                val unverified = missingFlatten.filter { it !in verified }
+                if (unverified.isNotEmpty()) {
+                    Log.w(TAG, "restoreAll verify failed for: $unverified")
+                    return@withContext Result(false, result.channel, "verify failed: $unverified")
+                }
+            }
+            result
+        }
+
+    /**
+     * 恢复单个丢失的无障碍服务（逐条恢复 + 回读验证）。
+     * 相比 restoreAll 批量写入，单服务恢复的优势：
+     *  - 单个服务恢复失败不影响其他服务；
+     *  - 写入后立即回读验证该服务是否真正生效，写入成功不等于系统已接受；
+     *  - 便于逐条记录恢复结果，事件日志更精准。
+     */
+    suspend fun restoreOne(ctx: Context, flatten: String): Result =
+        withContext(Dispatchers.IO) {
+            val current = AccessServiceRepo.enabledStrings(ctx).toMutableList()
+            if (flatten in current) {
+                return@withContext Result(true, Privilege.bestChannel(ctx), "already_enabled")
+            }
+            current.add(flatten)
+            val result = writeServices(ctx, current)
+            if (result.ok) {
+                writeAccessibilityEnabled(ctx)
+                // 回读验证：确认目标服务已出现在 enabled 列表中
+                val verified = AccessServiceRepo.enabledStrings(ctx)
+                if (flatten !in verified) {
+                    Log.w(TAG, "restoreOne verify failed for: $flatten")
+                    return@withContext Result(false, result.channel, "verify failed: service not in enabled list after write")
+                }
+            }
             result
         }
 

@@ -183,6 +183,7 @@
     <string name="self_guard_notif_text">监听 Settings.Secure 变更，被关闭后自动拉起</string>
     <string name="self_guard_guide_title">无障碍权限被关闭</string>
     <string name="self_guard_guide_text">自监控检测到本应用无障碍被关闭，但当前无 Root/Shizuku/ADB 通道，请手动开启（系统限制）。</string>
+    <string name="self_guard_restored_text">已自动恢复 %1$d 个无障碍服务</string>
 
     <!-- 应用保活 -->
     <string name="keepalive_log_relaunched">已后台无感拉起（第 %1$d 次）</string>

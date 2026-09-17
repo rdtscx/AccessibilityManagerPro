@@ -175,6 +175,7 @@
     <string name="self_guard_notif_text">Watching Settings.Secure; auto re-enables if disabled</string>
     <string name="self_guard_guide_title">Accessibility permission disabled</string>
     <string name="self_guard_guide_text">The self-monitor detected our accessibility service was disabled, but no Root/Shizuku/ADB channel is available. Please enable it manually (system restriction).</string>
+    <string name="self_guard_restored_text">Auto-restored %1$d accessibility service(s)</string>
 
     <!-- App keep-alive -->
     <string name="keepalive_log_relaunched">Silently relaunched (#%1$d)</string>

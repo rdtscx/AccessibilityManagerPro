@@ -20,10 +20,32 @@ class EventAdapter(
     private val items = mutableListOf<EventLog.Entry>()
     private val timeFmt = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
 
+    /** 包名 → 应用名称缓存，避免 onBind 中反复查询 PackageManager。 */
+    private val labelCache = mutableMapOf<String, String>()
+
     fun submit(list: List<EventLog.Entry>) {
         items.clear()
         items.addAll(list)
         notifyDataSetChanged()
+    }
+
+    /**
+     * 解析事件 pkg 字段的显示文本：
+     *  - 如果 pkg 是有效的应用包名，返回"应用名称 (包名)"格式；
+     *  - 如果是特殊标记（如 "system"）或无法解析，直接返回原值。
+     */
+    private fun resolveDisplayPkg(pkg: String): String {
+        if (pkg == "system" || pkg == context.packageName) return pkg
+        labelCache[pkg]?.let { return it }
+        val label = try {
+            val ai = context.packageManager.getApplicationInfo(pkg, 0)
+            val name = context.packageManager.getApplicationLabel(ai).toString()
+            if (name.isNotBlank() && name != pkg) "$name ($pkg)" else pkg
+        } catch (t: Throwable) {
+            pkg
+        }
+        labelCache[pkg] = label
+        return label
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -65,7 +87,7 @@ class EventAdapter(
             binding.icon.setImageResource(iconRes)
             binding.icon.setColorFilter(ContextCompat.getColor(context, color))
             binding.timeText.text = timeFmt.format(Date(e.ts))
-            binding.pkgText.text = e.pkg
+            binding.pkgText.text = resolveDisplayPkg(e.pkg)
             binding.detailText.text = e.detail
         }
     }
