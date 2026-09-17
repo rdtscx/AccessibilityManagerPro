@@ -53,8 +53,10 @@ object KeepAliveEngine {
     private val targets = ConcurrentHashMap<String, Target>()
     private val handler = Handler(Looper.getMainLooper())
 
-    /** 存活判定缓存（10 秒），避免列表滚动/巡检时反复查询 UsageStats（省电、防卡顿）。 */
+    /** 存活判定缓存（10 秒），避免列表滚动/巡检时反复查询 UsageStats（省电、防卡顿）。
+     *  带 128 条上限，超过时清理过期条目，防止长期运行内存泄漏。 */
     private val aliveCache = ConcurrentHashMap<String, Pair<Long, Boolean>>()
+    private const val ALIVE_CACHE_MAX = 128
 
     @Volatile
     private var service: SelfAccessService? = null
@@ -138,6 +140,11 @@ object KeepAliveEngine {
         val cached = aliveCache[pkg]
         if (cached != null && SystemClock.elapsedRealtime() - cached.first < 10_000L) {
             return cached.second
+        }
+        // 缓存超上限时清理过期条目（防止内存泄漏）
+        if (aliveCache.size > ALIVE_CACHE_MAX) {
+            val now = SystemClock.elapsedRealtime()
+            aliveCache.entries.removeAll { now - it.value.first >= 10_000L }
         }
         val result = checkAlive(ctx, pkg)
         aliveCache[pkg] = SystemClock.elapsedRealtime() to result

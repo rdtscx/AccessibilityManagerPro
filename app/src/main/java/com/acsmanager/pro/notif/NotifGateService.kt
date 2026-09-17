@@ -125,9 +125,14 @@ class NotifGateService : NotificationListenerService() {
                 Privilege.shizukuExec(this, *cmd)
             else -> null
         }
-        if (out == null) {
-            Log.w(TAG, "importance override failed for $pkg: $out")
-            EventLog.record(this, EventLog.TYPE_WARN, pkg, "override failed (need Android 14+)")
+        // shell 命令成功时输出为空；含 error 或 Exception 才是失败
+        val trimmed = out?.trim()
+        val failed = trimmed == null ||
+            trimmed.contains("error", ignoreCase = true) ||
+            trimmed.startsWith("Exception")
+        if (failed) {
+            Log.w(TAG, "importance override failed for $pkg, output=${out ?: "(null)"}")
+            EventLog.record(this, EventLog.TYPE_WARN, pkg, "override failed (need Android 14+ / shell channel)")
         } else {
             EventLog.record(this, EventLog.TYPE_SERVICE, pkg, "importance override -> L$level")
         }

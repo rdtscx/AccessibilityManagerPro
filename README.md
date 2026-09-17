@@ -1,4 +1,4 @@
-# 无障碍管理器 Pro（Accessibility Manager Pro）v1.4.1
+# 无障碍管理器 Pro（Accessibility Manager Pro）v1.5.0
 
 一款基于 Android 无障碍服务体系的**多功能管理器**。原理与原版「无障碍管理器（com.accessibilitymanager）」一致：
 读取系统 `AccessibilityManager` 真实服务列表，通过 `WRITE_SECURE_SETTINGS`（ADB 授权 / Root / Shizuku 三种通道）
@@ -8,7 +8,27 @@
 > ⚠️ 无障碍服务可读取屏幕内容（含账号、验证码等敏感信息）。本应用自身的无障碍服务**不读取屏幕内容**
 > （仅监听窗口切换事件），但请在系统设置中确认授权对象后再启用。本应用仅供合法用途。
 
-## v1.4.1 更新内容（本轮）
+## v1.5.0 更新内容
+
+- **修复应用扫描缓存 bug（重要）**：`AppsRepository.scan()` 原先不区分 `includeSystem` 参数，先扫"仅用户应用"再扫"全部应用"
+  时会返回错误的缓存结果。改为按参数分别缓存（`cachedAll` / `cachedUserOnly`），一次扫描同时生成两份列表，既修 bug 又省 IO。
+- **修复事件日志数据库频繁创建连接的性能问题**：`EventLog` 原先每次 `record()` 都新建 `SQLiteOpenHelper` 和数据库连接，
+  高频写入时开销大。改为单例连接 + 应用上下文，超过 2000 条自动清理最旧记录，防止数据库无限增长。
+- **修复保活存活判定缓存内存泄漏**：`KeepAliveEngine.aliveCache` 原先只写入不清理，长期运行后条目无限增长。
+  增加 128 条上限，超限时自动清理过期（>10 秒）条目。
+- **修复通知精细调控失败误判**：`NotifGateService` 原先 shell 输出为空时被误判为失败（实际上 `settings`/`cmd` 命令
+  成功时无输出）。改为与 `ServiceStateController` 一致的判定逻辑：空输出 = 成功，含 error/Exception 才是失败。
+- **备份恢复功能大幅完善**：原先 `exportJson/importJson` 只备份看门狗相关 4 项设置，现已覆盖全部 20+ 项配置
+  （自监控、应用保活名单与策略、通知等级、无障碍锁定/开机保活、主题语言、实验参数等），版本号升至 v2，
+  兼容 v1 旧备份（缺失字段不覆盖用户当前设置）。
+- **修复 Manifest 重复权限声明**：`FOREGROUND_SERVICE_SPECIAL_USE` 被声明了两次，合并为一条带 `targetApi="34"` 的声明。
+- **迁移废弃 API**：
+  - `App.kt`：`resources.updateConfiguration()` → `attachBaseContext` + `createConfigurationContext()`（标准语言切换方案）
+  - `MainActivity`：`onBackPressed()` → `OnBackPressedDispatcher`（API 33+ 推荐）
+  - `QuickToggleTileService`：`startActivityAndCollapse(Intent)` → `startActivityAndCollapse(PendingIntent)`（API 33+）
+- **开源规范完善**：新增 MIT LICENSE、CONTRIBUTING.md、Issue/PR 模板，欢迎社区贡献。
+
+## v1.4.1 更新内容
 
 - **修复「保活看门狗」开关打开即闪退（重要）**：根因是前台服务用两参 `startForeground(id, notif)` 启动——
   Android 14+（targetSdk 34）强制要求传入与 manifest 匹配的服务类型，否则抛

@@ -2,6 +2,7 @@ package com.acsmanager.pro.ui
 
 import android.content.ComponentName
 import android.os.Bundle
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.acsmanager.pro.R
@@ -46,6 +47,18 @@ class MainActivity : AppCompatActivity() {
         }
 
         selfProtectOnStartup()
+
+        // 使用 OnBackPressedDispatcher 替代已废弃的 onBackPressed（API 33+）
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (supportFragmentManager.backStackEntryCount > 0) {
+                    supportFragmentManager.popBackStack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
     }
 
     /**
@@ -79,14 +92,6 @@ class MainActivity : AppCompatActivity() {
             .replace(R.id.container, fragment)
         if (addToBack) t.addToBackStack(null)
         t.commit()
-    }
-
-    override fun onBackPressed() {
-        if (supportFragmentManager.backStackEntryCount > 0) {
-            supportFragmentManager.popBackStack()
-        } else {
-            super.onBackPressed()
-        }
     }
 
     override fun onDestroy() {

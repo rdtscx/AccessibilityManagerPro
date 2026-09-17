@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper
 
 /**
  * 事件日志：记录服务启用/停用/丢失/自动恢复等事件，供监控页展示。
+ * 使用单例数据库连接避免频繁创建/关闭，最多保留 2000 条记录防止无限增长。
  */
 object EventLog {
 
@@ -17,6 +18,8 @@ object EventLog {
     const val TYPE_WARN = "warn"
     const val TYPE_SERVICE = "service"
 
+    private const val MAX_RECORDS = 2000
+
     data class Entry(
         val id: Long,
         val ts: Long,
@@ -25,26 +28,42 @@ object EventLog {
         val detail: String
     )
 
+    @Volatile
+    private var dbHelper: EventDb? = null
+
+    private fun db(ctx: Context): EventDb {
+        dbHelper?.let { return it }
+        synchronized(this) {
+            dbHelper?.let { return it }
+            return EventDb(ctx.applicationContext).also { dbHelper = it }
+        }
+    }
+
     fun record(ctx: Context, type: String, pkg: String, detail: String) {
         try {
-            val db = EventDb(ctx).writableDatabase
+            val database = db(ctx).writableDatabase
             val cv = ContentValues().apply {
                 put("ts", System.currentTimeMillis())
                 put("type", type)
                 put("pkg", pkg)
                 put("detail", detail)
             }
-            db.insert("events", null, cv)
-            db.close()
+            database.insert("events", null, cv)
+            // 超过上限时清理最旧的记录（异步触发，不阻塞当前写入）
+            if (database.compileStatement("SELECT COUNT(*) FROM events").simpleQueryForLong() > MAX_RECORDS) {
+                database.execSQL(
+                    "DELETE FROM events WHERE _id IN (SELECT _id FROM events ORDER BY ts ASC LIMIT 100)"
+                )
+            }
         } catch (t: Throwable) {
             // 日志失败不影响主流程
         }
     }
 
     fun query(ctx: Context, limit: Int = 500): List<Entry> = try {
-        val db = EventDb(ctx).readableDatabase
+        val database = db(ctx).readableDatabase
         val list = mutableListOf<Entry>()
-        db.query(
+        database.query(
             "events", null, null, null, null, null, "ts DESC", "$limit"
         ).use { c ->
             val iId = c.getColumnIndexOrThrow("_id")
@@ -64,7 +83,6 @@ object EventLog {
                 )
             }
         }
-        db.close()
         list
     } catch (t: Throwable) {
         emptyList()
@@ -72,9 +90,7 @@ object EventLog {
 
     fun clear(ctx: Context) {
         try {
-            val db = EventDb(ctx).writableDatabase
-            db.delete("events", null, null)
-            db.close()
+            db(ctx).writableDatabase.delete("events", null, null)
         } catch (t: Throwable) {
         }
     }

@@ -1,7 +1,9 @@
 package com.acsmanager.pro.quick
 
+import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Intent
+import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import androidx.appcompat.app.AlertDialog
@@ -32,16 +34,12 @@ class QuickToggleTileService : TileService() {
         super.onClick()
         val target = Prefs.tileService(this)
         if (target.isNullOrBlank()) {
-            startActivityAndCollapse(
-                Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
+            collapseAndOpenMain()
             return
         }
         val cn = ComponentName.unflattenFromString(target)
         if (cn == null) {
-            startActivityAndCollapse(
-                Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
+            collapseAndOpenMain()
             return
         }
         val currentlyEnabled = AccessServiceRepo.enabledStrings(this).contains(target)
@@ -57,6 +55,25 @@ class QuickToggleTileService : TileService() {
                         .create()
                 )
             }
+        }
+    }
+
+    /**
+     * 收起快捷设置并打开主页面。
+     * API 33+ 使用 PendingIntent 版本（startActivityAndCollapse(Intent) 已废弃）；
+     * 低版本保持两参调用。
+     */
+    private fun collapseAndOpenMain() {
+        val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val pi = PendingIntent.getActivity(
+                this, 0, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            startActivityAndCollapse(pi)
+        } else {
+            @Suppress("DEPRECATION")
+            startActivityAndCollapse(intent)
         }
     }
 

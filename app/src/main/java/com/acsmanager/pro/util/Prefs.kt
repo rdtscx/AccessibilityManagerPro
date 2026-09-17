@@ -62,13 +62,40 @@ object Prefs {
     fun exportJson(ctx: Context): String {
         val o = JSONObject()
         o.put("app", APP_TAG)
-        o.put("version", 1)
+        o.put("version", 2)
+        // 看门狗
         o.put("watchdog_enabled", isWatchdogEnabled(ctx))
         o.put("watchdog_interval", watchdogIntervalMs(ctx))
-        o.put("protected", JSONObject().apply {
-            protectedServices(ctx).forEachIndexed { i, s -> put(i.toString(), s) }
-        })
+        o.put("protected", setToJson(protectedServices(ctx)))
         o.put("tile_service", tileService(ctx) ?: "")
+        // 自监控
+        o.put("self_guard_enabled", isSelfGuardEnabled(ctx))
+        o.put("self_guard_delay", selfGuardDelayMs(ctx))
+        // 应用保活
+        o.put("keepalive_apps", setToJson(keepAliveApps(ctx)))
+        o.put("keepalive_interval", keepAliveIntervalMs(ctx))
+        o.put("keepalive_screenoff_only", keepAliveScreenOffOnly(ctx))
+        o.put("keepalive_pause_low_battery", keepAlivePauseLowBattery(ctx))
+        o.put("keepalive_battery_threshold", keepAliveBatteryThreshold(ctx))
+        o.put("keepalive_black_screen", keepAliveBlackScreen(ctx))
+        o.put("keepalive_return_mode", keepAliveReturnMode(ctx))
+        // 通知
+        o.put("notif_levels", get(ctx).getString(KEY_NOTIF_LEVELS, "{}") ?: "{}")
+        o.put("notif_override_enabled", notifOverrideEnabled(ctx))
+        o.put("notif_history_enabled", notifHistoryEnabled(ctx))
+        // 无障碍锁定与开机保活
+        o.put("locked_accessibility", setToJson(lockedAccessibilityServices(ctx)))
+        o.put("boot_accessibility", setToJson(bootAccessibilityServices(ctx)))
+        // 保活提示
+        o.put("relaunch_toast", relaunchToastEnabled(ctx))
+        o.put("relaunch_toast_text", relaunchToastText(ctx) ?: "")
+        // 外观
+        o.put("theme", themeMode(ctx))
+        o.put("language", language(ctx))
+        // 无障碍权限页
+        o.put("accessperm_user_only", accessPermUserOnly(ctx))
+        // 实验
+        o.put("event_throttle", eventThrottleMs(ctx))
         return o.toString(2)
     }
 
@@ -76,24 +103,56 @@ object Prefs {
         return try {
             val o = JSONObject(json)
             if (o.optString("app") != APP_TAG) return false
+            val ver = o.optInt("version", 1)
+            // 看门狗
             setWatchdogEnabled(ctx, o.optBoolean("watchdog_enabled", false))
             setWatchdogIntervalMs(ctx, o.optLong("watchdog_interval", 60_000L))
-            val protected = mutableSetOf<String>()
-            val p = o.optJSONObject("protected")
-            if (p != null) {
-                val it = p.keys()
-                while (it.hasNext()) {
-                    val k = it.next()
-                    val v = p.optString(k)
-                    if (v.isNotBlank()) protected.add(v)
-                }
-            }
-            setProtectedServices(ctx, protected)
+            setProtectedServices(ctx, jsonToSet(o.optJSONObject("protected")))
             setTileService(ctx, o.optString("tile_service", "").ifBlank { null })
+            // v2+ 字段（v1 备份中不存在时使用默认值，不覆盖用户当前设置）
+            if (ver >= 2) {
+                setSelfGuardEnabled(ctx, o.optBoolean("self_guard_enabled", false))
+                setSelfGuardDelayMs(ctx, o.optLong("self_guard_delay", 1000L))
+                setKeepAliveApps(ctx, jsonToSet(o.optJSONObject("keepalive_apps")))
+                setKeepAliveIntervalMs(ctx, o.optLong("keepalive_interval", 30_000L))
+                setKeepAliveScreenOffOnly(ctx, o.optBoolean("keepalive_screenoff_only", true))
+                setKeepAlivePauseLowBattery(ctx, o.optBoolean("keepalive_pause_low_battery", true))
+                setKeepAliveBatteryThreshold(ctx, o.optInt("keepalive_battery_threshold", 15))
+                setKeepAliveBlackScreen(ctx, o.optBoolean("keepalive_black_screen", true))
+                setKeepAliveReturnMode(ctx, o.optString("keepalive_return_mode", "prev"))
+                o.optString("notif_levels")?.takeIf { it.isNotBlank() }?.let {
+                    get(ctx).edit().putString(KEY_NOTIF_LEVELS, it).apply()
+                }
+                setNotifOverrideEnabled(ctx, o.optBoolean("notif_override_enabled", true))
+                setNotifHistoryEnabled(ctx, o.optBoolean("notif_history_enabled", true))
+                setLockedAccessibilityServices(ctx, jsonToSet(o.optJSONObject("locked_accessibility")))
+                setBootAccessibilityServices(ctx, jsonToSet(o.optJSONObject("boot_accessibility")))
+                setRelaunchToastEnabled(ctx, o.optBoolean("relaunch_toast", false))
+                setRelaunchToastText(ctx, o.optString("relaunch_toast_text", "").ifBlank { null })
+                setThemeMode(ctx, o.optString("theme", "system"))
+                setLanguage(ctx, o.optString("language", "system"))
+                setAccessPermUserOnly(ctx, o.optBoolean("accessperm_user_only", false))
+                setEventThrottleMs(ctx, o.optLong("event_throttle", 300L))
+            }
             true
         } catch (t: Throwable) {
             false
         }
+    }
+
+    private fun setToJson(set: Set<String>): JSONObject = JSONObject().apply {
+        set.forEachIndexed { i, s -> put(i.toString(), s) }
+    }
+
+    private fun jsonToSet(obj: JSONObject?): Set<String> {
+        if (obj == null) return emptySet()
+        val result = mutableSetOf<String>()
+        val it = obj.keys()
+        while (it.hasNext()) {
+            val v = obj.optString(it.next())
+            if (v.isNotBlank()) result.add(v)
+        }
+        return result
     }
 
     // ---------- 无障碍自监控（ContentObserver 低耗电 + 延迟拉起） ----------

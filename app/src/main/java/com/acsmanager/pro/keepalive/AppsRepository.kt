@@ -25,26 +25,29 @@ object AppsRepository {
     }
 
     @Volatile
-    private var cachedScan: List<AppEntry>? = null
+    private var cachedAll: List<AppEntry>? = null
+    @Volatile
+    private var cachedUserOnly: List<AppEntry>? = null
+    @Volatile
     private var cacheTime = 0L
 
     private const val SCAN_TTL_MS = 60_000L
 
     /**
      * 扫描全机应用。Android 11+ 需要 QUERY_ALL_PACKAGES（已在 Manifest 声明）。
-     * 结果缓存 60 秒，避免页面反复进入时重复枚举（省 IO、省内存）。
+     * 结果缓存 60 秒，按 includeSystem 分别缓存，避免参数不同时返回错误结果。
      * @param includeSystem 是否包含系统软件
      */
     fun scan(ctx: Context, includeSystem: Boolean = true): List<AppEntry> {
         val now = System.currentTimeMillis()
-        val cached = cachedScan
+        val cached = if (includeSystem) cachedAll else cachedUserOnly
         if (cached != null && now - cacheTime < SCAN_TTL_MS) return cached
 
         val pm = ctx.packageManager
         val apps = pm.getInstalledApplications(0).orEmpty()
-        val list = mutableListOf<AppEntry>()
+        val allList = mutableListOf<AppEntry>()
+        val userList = mutableListOf<AppEntry>()
         for (ai in apps) {
-            if (!includeSystem && ai.isSystem) continue
             if (ai.packageName == ctx.packageName) continue
             val label = try {
                 pm.getApplicationLabel(ai)?.toString() ?: ai.packageName
@@ -56,23 +59,26 @@ object AppsRepository {
             } catch (t: Throwable) {
                 false
             }
-            list.add(
-                AppEntry(
-                    packageName = ai.packageName,
-                    label = label,
-                    isSystem = ai.isSystem,
-                    hasLauncher = hasLauncher
-                )
+            val entry = AppEntry(
+                packageName = ai.packageName,
+                label = label,
+                isSystem = ai.isSystem,
+                hasLauncher = hasLauncher
             )
+            allList.add(entry)
+            if (!ai.isSystem) userList.add(entry)
         }
-        val sorted = list.sortedBy { it.label.lowercase() }
-        cachedScan = sorted
+        val sortedAll = allList.sortedBy { it.label.lowercase() }
+        val sortedUser = userList.sortedBy { it.label.lowercase() }
+        cachedAll = sortedAll
+        cachedUserOnly = sortedUser
         cacheTime = now
-        return sorted
+        return if (includeSystem) sortedAll else sortedUser
     }
 
     fun invalidateScanCache() {
-        cachedScan = null
+        cachedAll = null
+        cachedUserOnly = null
         cacheTime = 0L
     }
 
