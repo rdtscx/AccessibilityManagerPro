@@ -242,21 +242,21 @@ object Prefs {
 
     // ---------- 统计 ----------
 
-    private fun today(ctx: Context): String {
+    private fun today(): String {
         val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
         return sdf.format(java.util.Date())
     }
 
     fun relaunchCount(ctx: Context): Int {
         val d = get(ctx).getString("relaunch_date", "")
-        return if (d == today(ctx)) get(ctx).getInt("relaunch_count", 0) else 0
+        return if (d == today()) get(ctx).getInt("relaunch_count", 0) else 0
     }
 
     fun bumpRelaunch(ctx: Context) {
         val e = get(ctx).edit()
         val d = get(ctx).getString("relaunch_date", "")
-        val c = if (d == today(ctx)) get(ctx).getInt("relaunch_count", 0) else 0
-        e.putString("relaunch_date", today(ctx))
+        val c = if (d == today()) get(ctx).getInt("relaunch_count", 0) else 0
+        e.putString("relaunch_date", today())
         e.putInt("relaunch_count", c + 1)
         e.apply()
     }

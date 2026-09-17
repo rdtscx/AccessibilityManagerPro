@@ -88,7 +88,7 @@ object KeepAliveEngine {
 
     /** 亮屏恢复：恢复保活巡检。 */
     fun resume() {
-        val ctx = service ?: return
+        if (service == null) return
         if (targets.isNotEmpty()) {
             handler.removeCallbacks(checkRunnable)
             handler.postDelayed(checkRunnable, 3_000L)

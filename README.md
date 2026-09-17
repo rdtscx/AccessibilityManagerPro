@@ -1,4 +1,4 @@
-# 无障碍管理器 Pro（Accessibility Manager Pro）v1.7.0
+# 无障碍管理器 Pro（Accessibility Manager Pro）v1.7.1
 
 一款基于 Android 无障碍服务体系的**多功能管理器**。原理与原版「无障碍管理器（com.accessibilitymanager）」一致：
 读取系统 `AccessibilityManager` 真实服务列表，通过 `WRITE_SECURE_SETTINGS`（ADB 授权 / Root / Shizuku 三种通道）
@@ -7,6 +7,18 @@
 
 > ⚠️ 无障碍服务可读取屏幕内容（含账号、验证码等敏感信息）。本应用自身的无障碍服务**不读取屏幕内容**
 > （仅监听窗口切换事件），但请在系统设置中确认授权对象后再启用。本应用仅供合法用途。
+
+## v1.7.1 更新内容（紧急修复）
+
+- **修复实验页屏幕闪烁 bug（重要）**：v1.7.0 中实验页主题按钮初始化时缺少 `programmaticSwitch` 保护，
+  导致 `onResume` → `check()` → 触发 listener → `recreate()` → 重新走 `onResume` 的无限循环，
+  表现为进入实验页后屏幕持续闪烁。已修复：主题按钮和所有开关初始化时均用 `programmaticSwitch` 保护，
+  且主题切换时若模式未变化则不 `recreate`。
+- **修复实验页开关状态错乱**：`onResume` 中设置开关状态时未保护，会触发互斥逻辑导致开关状态被意外修改。
+- 修复 `KeepAliveEngine.resume()` 未使用变量 `ctx`。
+- 修复 `Prefs.today()` 未使用参数 `ctx`。
+- 移除 `HomeFragment` 中冗余的 `else` 分支（枚举已穷举）。
+- lint 警告从 9 个减少至 6 个。
 
 ## v1.7.0 更新内容
 

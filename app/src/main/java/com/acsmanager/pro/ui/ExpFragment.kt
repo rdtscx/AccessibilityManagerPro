@@ -99,12 +99,14 @@ class ExpFragment : Fragment() {
 
         // 主题切换：白天 / 黑夜 / 跟随系统，立即生效
         binding.themeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
+            if (!isChecked || programmaticSwitch) return@addOnButtonCheckedListener
             val mode = when (checkedId) {
                 R.id.btn_theme_light -> "light"
                 R.id.btn_theme_dark -> "dark"
                 else -> "system"
             }
+            // 模式未变化时不 recreate，避免不必要的闪烁
+            if (Prefs.themeMode(requireContext()) == mode) return@addOnButtonCheckedListener
             Prefs.setThemeMode(requireContext(), mode)
             applyTheme(mode)
         }
@@ -142,20 +144,25 @@ class ExpFragment : Fragment() {
         updateThrottleLabel()
         binding.sliderThrottle.value = Prefs.eventThrottleMs(requireContext()).toFloat()
 
+        // 初始化开关状态（程序化设置，不触发 listener 和互斥逻辑）
+        programmaticSwitch = true
         binding.switchScreenoff.isChecked = Prefs.keepAliveScreenOffOnly(requireContext())
         binding.switchLowbattery.isChecked = Prefs.keepAlivePauseLowBattery(requireContext())
         binding.switchDoze.isChecked = Prefs.dozeModeEnabled(requireContext())
         binding.switchNotifHistory.isChecked = Prefs.notifHistoryEnabled(requireContext())
         binding.switchNotifOverride.isChecked = Prefs.notifOverrideEnabled(requireContext())
+        programmaticSwitch = false
 
-        // 初始化主题按钮选中状态
+        // 初始化主题按钮选中状态（程序化设置，不触发 listener）
         val themeBtn = when (Prefs.themeMode(requireContext())) {
             "light" -> R.id.btn_theme_light
             "dark" -> R.id.btn_theme_dark
             else -> R.id.btn_theme_system
         }
         if (binding.themeToggle.checkedButtonId != themeBtn) {
+            programmaticSwitch = true
             binding.themeToggle.check(themeBtn)
+            programmaticSwitch = false
         }
 
         updateIntervalLabel()

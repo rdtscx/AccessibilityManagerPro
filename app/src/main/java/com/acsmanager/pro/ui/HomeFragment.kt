@@ -227,8 +227,6 @@ class HomeFragment : Fragment() {
                 Triple(getString(R.string.status_shizuku_not_connected), true, getString(R.string.status_shizuku_start))
             Privilege.ShizukuStatus.NOT_INSTALLED ->
                 Triple(getString(R.string.status_shizuku_not_installed), false, "")
-            else ->
-                Triple(getString(R.string.status_shizuku_low_api), false, "")
         }
         binding.tvShizukuStatus.text = text
         binding.btnShizukuGrant.visibility = if (showBtn) View.VISIBLE else View.GONE
