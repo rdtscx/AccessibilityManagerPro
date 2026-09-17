@@ -1,4 +1,4 @@
-# 无障碍管理器 Pro（Accessibility Manager Pro）v1.5.0
+# 无障碍管理器 Pro（Accessibility Manager Pro）v1.6.0
 
 一款基于 Android 无障碍服务体系的**多功能管理器**。原理与原版「无障碍管理器（com.accessibilitymanager）」一致：
 读取系统 `AccessibilityManager` 真实服务列表，通过 `WRITE_SECURE_SETTINGS`（ADB 授权 / Root / Shizuku 三种通道）
@@ -7,6 +7,16 @@
 
 > ⚠️ 无障碍服务可读取屏幕内容（含账号、验证码等敏感信息）。本应用自身的无障碍服务**不读取屏幕内容**
 > （仅监听窗口切换事件），但请在系统设置中确认授权对象后再启用。本应用仅供合法用途。
+
+## v1.6.0 更新内容
+
+- **首次启动自动弹出授权引导页（新能力）**：应用首次打开时自动跳转到授权向导页，每 2 秒实时检测 Root / Shizuku / ADB
+  三种通道状态；任一通道就绪后自动返回首页并标记引导完成。未授权时按返回键即可回到首页，不强制用户授权。
+- **熄屏休眠省电模式（新能力）**：熄屏后自动暂停应用保活巡检、自监控兜底巡检从 5 分钟降频至 15 分钟，显著降低待机耗电；
+  亮屏后 3 秒内自动恢复完整保活能力。实验页可开关，默认开启。
+- **修复多个 lint 警告**：移除 `KeepAliveEngine` 未使用变量 `events`、`ServiceStateController` 两处未使用变量 `ch`、
+  `ServiceDetailActivity` 未使用变量 `cn`，代码更干净。
+- **GuideActivity 优化**：Shizuku 授权回调参数 `result` 未使用改为 `_`，返回键同时标记引导完成避免重复弹出。
 
 ## v1.5.0 更新内容
 

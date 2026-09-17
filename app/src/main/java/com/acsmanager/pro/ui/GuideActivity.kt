@@ -6,23 +6,43 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.acsmanager.pro.R
 import com.acsmanager.pro.core.Privilege
 import com.acsmanager.pro.databinding.ActivityGuideBinding
+import com.acsmanager.pro.util.Prefs
 import rikka.shizuku.Shizuku
 
 /**
  * 授权向导：Root / Shizuku / ADB 三种通道的状态检测与引导。
+ * 首次启动时由 MainActivity 自动弹出；实时检测授权状态，任一通道就绪即自动返回首页；
+ * 未授权时按返回键即可回到首页。
  */
 class GuideActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityGuideBinding
     private val requestCode = 1024
+    private val handler = Handler(Looper.getMainLooper())
 
-    private val shizukuListener = Shizuku.OnRequestPermissionResultListener { code, result ->
+    /** 每 2 秒检测一次授权状态，检测到就绪则自动回首页。 */
+    private val detectRunnable = object : Runnable {
+        override fun run() {
+            detect()
+            if (isAnyChannelReady()) {
+                Prefs.setFirstGuideDone(this@GuideActivity, true)
+                Toast.makeText(this@GuideActivity, R.string.guide_auto_enter, Toast.LENGTH_SHORT).show()
+                finish()
+                return
+            }
+            handler.postDelayed(this, 2000L)
+        }
+    }
+
+    private val shizukuListener = Shizuku.OnRequestPermissionResultListener { code, _ ->
         if (code == requestCode) {
             runOnUiThread { detect() }
         }
@@ -33,14 +53,16 @@ class GuideActivity : AppCompatActivity() {
         binding = ActivityGuideBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.toolbar.setNavigationOnClickListener { finish() }
+        binding.toolbar.setNavigationOnClickListener {
+            Prefs.setFirstGuideDone(this, true)
+            finish()
+        }
 
         binding.adbCommand.text =
             "adb shell pm grant ${packageName} android.permission.WRITE_SECURE_SETTINGS"
 
         binding.btnShizukuInstall.setOnClickListener {
             val url = if (Privilege.hasShizukuInstalled(this)) {
-                // 已安装则打开应用详情
                 Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                     .setData(Uri.parse("package:${Privilege.SHIZUKU_PKG}"))
             } else {
@@ -100,15 +122,23 @@ class GuideActivity : AppCompatActivity() {
         } catch (t: Throwable) {
         }
         detect()
+        // 启动实时检测
+        handler.removeCallbacks(detectRunnable)
+        handler.postDelayed(detectRunnable, 2000L)
     }
 
     override fun onPause() {
         super.onPause()
+        handler.removeCallbacks(detectRunnable)
         try {
             Shizuku.removeRequestPermissionResultListener(shizukuListener)
         } catch (t: Throwable) {
         }
     }
+
+    /** 任一通道就绪即视为授权完成。 */
+    private fun isAnyChannelReady(): Boolean =
+        Privilege.hasRoot() || Privilege.shizukuReady() || Privilege.hasAppGranted(this)
 
     private fun detect() {
         setStatus(binding.rootStatus, Privilege.hasRoot(), R.string.guide_root_ok, R.string.guide_root_fail)

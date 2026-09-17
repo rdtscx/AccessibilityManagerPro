@@ -80,6 +80,22 @@ object KeepAliveEngine {
         handler.removeCallbacks(checkRunnable)
     }
 
+    /** 熄屏休眠：暂停保活巡检，降低耗电。 */
+    fun pause() {
+        handler.removeCallbacks(checkRunnable)
+        Log.d(TAG, "doze: keepalive paused")
+    }
+
+    /** 亮屏恢复：恢复保活巡检。 */
+    fun resume() {
+        val ctx = service ?: return
+        if (targets.isNotEmpty()) {
+            handler.removeCallbacks(checkRunnable)
+            handler.postDelayed(checkRunnable, 3_000L)
+        }
+        Log.d(TAG, "doze: keepalive resumed")
+    }
+
     /** 重新加载保活名单；名单非空时确保巡检已调度（名单为空则不调度，零开销）。 */
     fun reloadTargets(ctx: Context) {
         val selected = Prefs.keepAliveApps(ctx)
@@ -221,7 +237,7 @@ object KeepAliveEngine {
     private fun hasUsageAccess(ctx: Context): Boolean = try {
         val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val end = System.currentTimeMillis()
-        val events = usm.queryEvents(end - 1000, end)
+        usm.queryEvents(end - 1000, end)
         true
     } catch (t: SecurityException) {
         false

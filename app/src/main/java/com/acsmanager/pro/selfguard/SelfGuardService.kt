@@ -5,10 +5,12 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.database.ContentObserver
 import android.os.Build
 import android.os.Handler
@@ -20,6 +22,7 @@ import com.acsmanager.pro.R
 import com.acsmanager.pro.core.AccessServiceRepo
 import com.acsmanager.pro.core.Privilege
 import com.acsmanager.pro.core.ServiceStateController
+import com.acsmanager.pro.keepalive.KeepAliveEngine
 import com.acsmanager.pro.ui.MainActivity
 import com.acsmanager.pro.util.Prefs
 import com.acsmanager.pro.watchdog.EventLog
@@ -85,6 +88,37 @@ class SelfGuardService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val handler = Handler(Looper.getMainLooper())
     private var observerRegistered = false
+    private var screenReceiverRegistered = false
+
+    /** 屏幕状态广播：熄屏进入休眠（暂停保活巡检），亮屏恢复。 */
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_SCREEN_OFF -> enterDoze()
+                Intent.ACTION_SCREEN_ON -> exitDoze()
+            }
+        }
+    }
+
+    /** 熄屏休眠：暂停应用保活巡检，自监控兜底巡检降频至 15 分钟。 */
+    private fun enterDoze() {
+        if (!Prefs.dozeModeEnabled(this)) return
+        Prefs.setDozeActive(true)
+        KeepAliveEngine.pause()
+        handler.removeCallbacks(fallbackRunnable)
+        handler.postDelayed(fallbackRunnable, 15 * 60_000L)
+        Log.i(TAG, "doze: screen off, keepalive paused, fallback 15min")
+    }
+
+    /** 亮屏恢复：恢复应用保活巡检，自监控兜底巡检恢复 5 分钟。 */
+    private fun exitDoze() {
+        if (!Prefs.isDozeActive()) return
+        Prefs.setDozeActive(false)
+        KeepAliveEngine.resume()
+        handler.removeCallbacks(fallbackRunnable)
+        handler.postDelayed(fallbackRunnable, 5 * 60_000L)
+        Log.i(TAG, "doze: screen on, keepalive resumed, fallback 5min")
+    }
 
     /** ContentObserver：Settings.Secure 数据库任何变更都会回调（低耗电关键）。 */
     private val secureObserver = object : ContentObserver(handler) {
@@ -93,11 +127,12 @@ class SelfGuardService : Service() {
         }
     }
 
-    /** 兜底慢检：ContentObserver 意外失效时的最后防线（每 5 分钟一次，开销可忽略）。 */
+    /** 兜底慢检：ContentObserver 意外失效时的最后防线。亮屏 5 分钟，熄屏休眠 15 分钟。 */
     private val fallbackRunnable = object : Runnable {
         override fun run() {
             onSecureChanged()
-            handler.postDelayed(this, 5 * 60_000L)
+            val interval = if (Prefs.isDozeActive()) 15 * 60_000L else 5 * 60_000L
+            handler.postDelayed(this, interval)
         }
     }
 
@@ -119,6 +154,16 @@ class SelfGuardService : Service() {
             )
             handler.post(fallbackRunnable)
             Log.i(TAG, "ContentObserver registered on Settings.Secure")
+        }
+        // 注册屏幕状态监听（熄屏休眠 / 亮屏恢复）
+        if (!screenReceiverRegistered) {
+            screenReceiverRegistered = true
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+            }
+            registerReceiver(screenReceiver, filter)
+            Log.i(TAG, "Screen state receiver registered")
         }
         return START_STICKY
     }
@@ -320,6 +365,14 @@ class SelfGuardService : Service() {
             }
             observerRegistered = false
         }
+        if (screenReceiverRegistered) {
+            try {
+                unregisterReceiver(screenReceiver)
+            } catch (t: Throwable) {
+            }
+            screenReceiverRegistered = false
+        }
+        Prefs.setDozeActive(false)
         handler.removeCallbacks(fallbackRunnable)
         handler.removeCallbacksAndMessages(null)
         scope.cancel()

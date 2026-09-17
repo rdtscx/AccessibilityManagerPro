@@ -422,4 +422,34 @@ object Prefs {
     fun setEventThrottleMs(ctx: Context, v: Long) {
         get(ctx).edit().putLong("event_throttle", v.coerceIn(0L, 5_000L)).apply()
     }
+
+    // ---------- 首次启动引导 ----------
+
+    /** 用户是否已完成首次授权引导（完成后不再自动弹出引导页）。 */
+    fun firstGuideDone(ctx: Context): Boolean =
+        get(ctx).getBoolean("first_guide_done", false)
+
+    fun setFirstGuideDone(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("first_guide_done", v).apply()
+    }
+
+    // ---------- 熄屏休眠省电模式 ----------
+
+    /** 熄屏后是否进入休眠模式（暂停保活巡检、降低自监控频率，亮屏恢复）。默认开。 */
+    fun dozeModeEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("doze_mode_enabled", true)
+
+    fun setDozeModeEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("doze_mode_enabled", v).apply()
+    }
+
+    /** 当前是否处于熄屏休眠状态（运行时标记，不持久化）。 */
+    @Volatile
+    private var dozeActive = false
+
+    fun isDozeActive(): Boolean = dozeActive
+
+    fun setDozeActive(v: Boolean) {
+        dozeActive = v
+    }
 }

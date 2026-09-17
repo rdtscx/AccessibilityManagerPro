@@ -48,7 +48,8 @@ class ServiceDetailActivity : AppCompatActivity() {
             finish()
             return
         }
-        val cn = ComponentName.unflattenFromString(flatten) ?: run {
+        // 验证组件名格式合法
+        if (ComponentName.unflattenFromString(flatten) == null) {
             finish()
             return
         }

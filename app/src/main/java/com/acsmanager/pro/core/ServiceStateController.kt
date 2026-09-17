@@ -72,14 +72,14 @@ object ServiceStateController {
         val result = writeServices(ctx, emptyList())
         if (result.ok) {
             try {
-                when (val ch = Privilege.bestChannel(ctx)) {
+                when (Privilege.bestChannel(ctx)) {
                     Privilege.Channel.APP_GRANTED ->
                         Settings.Secure.putString(ctx.contentResolver, KEY_ENABLED, "0")
                     Privilege.Channel.ROOT ->
                         Privilege.runShell(arrayOf("su", "-c", "settings put secure $KEY_ENABLED 0"))
                     Privilege.Channel.SHIZUKU ->
                         Privilege.shizukuExec(ctx, "settings", "put", "secure", KEY_ENABLED, "0")
-                    else -> null
+                    else -> Unit
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "disable accessibility_enabled failed", t)
@@ -127,7 +127,7 @@ object ServiceStateController {
 
     private fun writeAccessibilityEnabled(ctx: Context) {
         try {
-            when (val ch = Privilege.bestChannel(ctx)) {
+            when (Privilege.bestChannel(ctx)) {
                 Privilege.Channel.APP_GRANTED ->
                     Settings.Secure.putString(ctx.contentResolver, KEY_ENABLED, "1")
                 Privilege.Channel.ROOT ->

@@ -60,6 +60,10 @@ class ExpFragment : Fragment() {
             Prefs.setKeepAlivePauseLowBattery(requireContext(), checked)
         }
 
+        binding.switchDoze.setOnCheckedChangeListener { _, checked ->
+            Prefs.setDozeModeEnabled(requireContext(), checked)
+        }
+
         binding.sliderInterval.addOnChangeListener { _, value, fromUser ->
             if (!fromUser) return@addOnChangeListener
             Prefs.setKeepAliveIntervalMs(requireContext(), (value * 1000).toLong())
@@ -109,6 +113,7 @@ class ExpFragment : Fragment() {
 
         binding.switchScreenoff.isChecked = Prefs.keepAliveScreenOffOnly(requireContext())
         binding.switchLowbattery.isChecked = Prefs.keepAlivePauseLowBattery(requireContext())
+        binding.switchDoze.isChecked = Prefs.dozeModeEnabled(requireContext())
         binding.switchNotifHistory.isChecked = Prefs.notifHistoryEnabled(requireContext())
         binding.switchNotifOverride.isChecked = Prefs.notifOverrideEnabled(requireContext())
 

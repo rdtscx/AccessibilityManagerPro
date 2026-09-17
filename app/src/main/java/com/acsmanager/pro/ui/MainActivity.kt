@@ -1,6 +1,7 @@
 package com.acsmanager.pro.ui
 
 import android.content.ComponentName
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
@@ -11,6 +12,7 @@ import com.acsmanager.pro.core.Privilege
 import com.acsmanager.pro.core.ServiceStateController
 import com.acsmanager.pro.databinding.ActivityMainBinding
 import com.acsmanager.pro.selfguard.SelfAccessService
+import com.acsmanager.pro.util.Prefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,6 +49,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         selfProtectOnStartup()
+
+        // 首次启动：自动弹出授权引导页（用户可按返回键跳过）
+        if (!Prefs.firstGuideDone(this)) {
+            startActivity(Intent(this, GuideActivity::class.java))
+        }
 
         // 使用 OnBackPressedDispatcher 替代已废弃的 onBackPressed（API 33+）
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
