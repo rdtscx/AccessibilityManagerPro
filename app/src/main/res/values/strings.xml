@@ -338,7 +338,7 @@
     <string name="accperm_opt_lock">锁定保活（被关闭后自动无感拉起）</string>
     <string name="accperm_opt_boot">开机启动保活（开机后自动恢复此服务）</string>
     <string name="accperm_opt_toast">显示 Toast 保活提示（全局）</string>
-    <string name="accperm_opt_delay">延迟一秒保活（全局）</string>
+    <string name="accperm_opt_delay">保活延迟（全局）</string>
     <string name="accperm_opt_user_only">只显示用户应用（本页）</string>
     <string name="accperm_opt_hide_card">隐藏后台卡片</string>
     <string name="accperm_opt_hide_card_note">需系统级能力，当前版本暂不可用</string>

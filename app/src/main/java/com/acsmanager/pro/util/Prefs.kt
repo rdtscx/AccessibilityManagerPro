@@ -120,7 +120,7 @@ object Prefs {
                 setKeepAliveBatteryThreshold(ctx, o.optInt("keepalive_battery_threshold", 15))
                 setKeepAliveBlackScreen(ctx, o.optBoolean("keepalive_black_screen", true))
                 setKeepAliveReturnMode(ctx, o.optString("keepalive_return_mode", "prev"))
-                o.optString("notif_levels")?.takeIf { it.isNotBlank() }?.let {
+                o.optString("notif_levels").takeIf { it.isNotBlank() }?.let {
                     get(ctx).edit().putString(KEY_NOTIF_LEVELS, it).apply()
                 }
                 setNotifOverrideEnabled(ctx, o.optBoolean("notif_override_enabled", true))

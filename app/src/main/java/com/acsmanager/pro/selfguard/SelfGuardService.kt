@@ -170,6 +170,9 @@ class SelfGuardService : Service() {
             registerReceiver(screenReceiver, filter)
             Log.i(TAG, "Screen state receiver registered")
         }
+        // 启动后立即检测一次：覆盖开机、服务重启、应用从后台恢复等场景，
+        // 确保锁定/开机保活的服务在任何情况下被关闭后都能被拉起。
+        handler.post { onSecureChanged() }
         return START_STICKY
     }
 
@@ -363,6 +366,26 @@ class SelfGuardService : Service() {
             )
         } catch (t: Throwable) {
             Log.w(TAG, "open accessibility settings failed", t)
+        }
+    }
+
+    /**
+     * 用户从最近任务中移除应用时，重启自监控服务，确保持续运行。
+     * 部分厂商系统会在移除任务时杀死服务，此方法作为兜底重启。
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.i(TAG, "task removed, restarting self guard")
+        val restartIntent = Intent(this, SelfGuardService::class.java)
+            .setAction(ACTION_START)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(restartIntent)
+            } else {
+                startService(restartIntent)
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "restart on task removed failed", t)
         }
     }
 
