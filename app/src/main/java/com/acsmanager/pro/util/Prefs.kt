@@ -452,4 +452,25 @@ object Prefs {
     fun setDozeActive(v: Boolean) {
         dozeActive = v
     }
+
+    // ---------- 用户主动关闭冷却期 ----------
+
+    /**
+     * 记录用户在本软件中主动关闭的无障碍服务（带时间戳），自监控在冷却期内不自动恢复，
+     * 避免用户想关闭被锁定服务时被立即拉起。冷却期默认 5 秒。
+     */
+    fun markUserDisabled(ctx: Context, flatten: String) {
+        get(ctx).edit().putLong("user_disabled_$flatten", System.currentTimeMillis()).apply()
+    }
+
+    /** 检查服务是否在用户主动关闭的冷却期内（默认 5 秒）。 */
+    fun isUserDisabledCooldown(ctx: Context, flatten: String, cooldownMs: Long = 5_000L): Boolean {
+        val t = get(ctx).getLong("user_disabled_$flatten", 0)
+        if (t == 0L) return false
+        if (System.currentTimeMillis() - t > cooldownMs) {
+            get(ctx).edit().remove("user_disabled_$flatten").apply()
+            return false
+        }
+        return true
+    }
 }

@@ -71,6 +71,8 @@ class AccessibilityPermActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 回到页面时清除乐观状态，重新读取系统真实状态，避免 UI 与实际不一致
+        optimistic.clear()
         refresh()
     }
 
@@ -120,6 +122,8 @@ class AccessibilityPermActivity : AppCompatActivity() {
         val flat = item.flatten
         if (flat in toggling) return
         toggling.add(flat)
+        // 用户主动关闭时记录冷却期，自监控在冷却期内不自动恢复
+        if (!enabled) Prefs.markUserDisabled(this, flat)
         val ctx = this
         scope.launch {
             val r = withContext(Dispatchers.IO) {
@@ -128,6 +132,9 @@ class AccessibilityPermActivity : AppCompatActivity() {
             toggling.remove(flat)
             if (r.ok) {
                 optimistic[flat] = enabled
+            } else if (!enabled) {
+                // 关闭失败时清除冷却期，避免后续无法自动恢复
+                Prefs.markUserDisabled(ctx, flat) // 覆盖为当前时间，仍在冷却期内
             }
             Toast.makeText(
                 ctx,

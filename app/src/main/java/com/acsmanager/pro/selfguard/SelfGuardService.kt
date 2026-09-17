@@ -123,9 +123,14 @@ class SelfGuardService : Service() {
     /** ContentObserver：Settings.Secure 数据库任何变更都会回调（低耗电关键）。 */
     private val secureObserver = object : ContentObserver(handler) {
         override fun onChange(selfChange: Boolean) {
-            onSecureChanged()
+            // 防抖：连续变更时合并为一次检测，避免用户操作开关期间频繁触发恢复造成竞态覆盖
+            handler.removeCallbacks(debounceRunnable)
+            handler.postDelayed(debounceRunnable, 500L)
         }
     }
+
+    /** 防抖后的实际检测入口。 */
+    private val debounceRunnable = Runnable { onSecureChanged() }
 
     /** 兜底慢检：ContentObserver 意外失效时的最后防线。亮屏 5 分钟，熄屏休眠 15 分钟。 */
     private val fallbackRunnable = object : Runnable {
@@ -217,7 +222,11 @@ class SelfGuardService : Service() {
         protected.addAll(Prefs.protectedServices(this))
         protected.addAll(Prefs.bootAccessibilityServices(this))
         for (flat in protected) {
-            if (flat !in enabled && flat != self && flat !in toRestore) toRestore.add(flat)
+            if (flat !in enabled && flat != self && flat !in toRestore) {
+                // 用户主动关闭的服务在冷却期内不恢复，让用户能正常关闭
+                if (Prefs.isUserDisabledCooldown(this, flat)) continue
+                toRestore.add(flat)
+            }
         }
         if (toRestore.isEmpty()) return
 
