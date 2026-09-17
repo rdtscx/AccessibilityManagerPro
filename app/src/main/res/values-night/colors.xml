@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+    暗色模式配色（依据 Material Design / M3 暗色规范与人眼舒适度研究）：
+    - 背景避免纯黑 #000000，使用 #121212 系；卡片用 #1E1E1E 提亮表达层级
+    - 正文文字 #E0E0E0 系，对比度 ≥ 12:1（AAA）；辅助文字提亮至 #CAC4D0，避免"看不清"
+    - 强调色用低饱和高亮度色调（200 档），减少暗色下的刺眼感
+    - 状态色用柔和低饱和色（绿 #81C995 / 黄 #FDD663 / 红 #F28B82）
+    -->
+
+    <!-- M3 暗色主色：亮化低饱和蓝（蓝 200 档） -->
+    <color name="primary">#A6C8FF</color>
+    <color name="primary_dark">#7DAFFF</color>
+    <color name="on_primary">#002F6E</color>
+    <color name="primary_container">#1E5AA8</color>
+    <color name="on_primary_container">#D3E4FF</color>
+
+    <!-- 次要色：柔和绿 -->
+    <color name="secondary">#81C995</color>
+    <color name="on_secondary">#00391D</color>
+    <color name="secondary_container">#1E5C3C</color>
+    <color name="on_secondary_container">#A8F0C0</color>
+
+    <!-- 表面与文字（关键：辅助文字提亮保证可读性） -->
+    <color name="surface_variant">#44464F</color>
+    <color name="on_surface_variant">#CAC4D0</color>
+    <color name="outline">#938F99</color>
+    <color name="accent">#7DE2B0</color>
+
+    <!-- 状态色：暗色下柔和低饱和，长时间观看不刺眼 -->
+    <color name="status_ok">#81C995</color>
+    <color name="status_warn">#FDD663</color>
+    <color name="status_err">#F28B82</color>
+    <color name="status_muted">#757575</color>
+
+    <!-- 卡片背景：浅黑表达层级（非纯黑） -->
+    <color name="card_bg">#1E1E1E</color>
+
+    <!-- 能力徽章（暗色） -->
+    <color name="chip_bg">#1E3A5F</color>
+    <color name="chip_text">#AECBFA</color>
+
+    <!-- 纯白/纯黑不用于暗色界面文字，保留定义避免引用缺失 -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+
+    <!-- 桌面小部件文字（暗色下提亮保证可读） -->
+    <color name="widget_text">#E0E0E0</color>
+    <color name="widget_text_sub">#9E9E9E</color>
+</resources>

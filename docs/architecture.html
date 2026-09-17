@@ -1,0 +1,131 @@
+<html style="margin:0;padding:0;">
+<div style="background-color:transparent;box-sizing:border-box;--accent:#A3D5E8;font-family:'Roboto','PingFang SC','Segoe UI',Arial,sans-serif;color:#1A1B1C;max-width:760px;">
+  <div style="font-size:16px;font-weight:600;padding:4px 2px 2px;">无障碍管理器 Pro · 原理与架构 <span style="font-size:11px;font-weight:500;color:#6B7280;background:rgba(163,213,232,0.25);border-radius:10px;padding:2px 8px;margin-left:6px;">v1.4.1 · 适配 Android 5.0(API 21)~17 · release 1.86MB · 前台服务类型修复/锁定图标优化</span></div>
+  <div style="font-size:12px;color:#6B7280;padding:0 2px 10px;">示意：按本应用实际实现绘制的分层结构与四条自动化闭环（自监控 / 服务保活 / 应用保活 / 通知调控）</div>
+
+  <!-- 第1层：系统侧 -->
+  <div style="border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:10px 12px;margin:6px 0;background:rgba(163,213,232,0.12);">
+    <div style="font-size:12px;font-weight:600;color:#1A1B1C;padding-bottom:6px;">① 系统侧 · Android 平台（API 21~37 全版本守卫，低版本自动降级）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <div style="flex:1 1 200px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;">
+        <div style="font-weight:600;">AccessibilityManager</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">读取已安装/已启用无障碍服务 · 本应用低耗电服务仅监听窗口事件（不读屏幕内容）</div>
+      </div>
+      <div style="flex:1 1 200px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;">
+        <div style="font-weight:600;">Settings.Secure</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">enabled_accessibility_services 组件串 + accessibility_enabled · 数据库变更触发 ContentObserver（零轮询）</div>
+      </div>
+      <div style="flex:1 1 200px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;">
+        <div style="font-weight:600;">UsageStatsManager</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">前台/停止事件 → 判定目标应用是否掉线（需"使用情况访问"，API 21 返回空不崩溃）</div>
+      </div>
+      <div style="flex:1 1 200px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;">
+        <div style="font-weight:600;">NotificationManager / Settings.Global·System</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">通知拦截与重要性 · 开发者选项键值（动画缩放 / 不保留活动 / GPU 渲染…）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第2层：授权通道 -->
+  <div style="border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:10px 12px;margin:6px 0;background:rgba(255,255,255,0.6);">
+    <div style="font-size:12px;font-weight:600;padding-bottom:6px;">② 授权通道（写系统安全设置 / 执行系统命令所需，自动探测最佳通道）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <div style="flex:1 1 160px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;border-left:3px solid #52C41A;">
+        <div style="font-weight:600;">ADB 已授权</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">pm grant WRITE_SECURE_SETTINGS 后应用内直写</div>
+      </div>
+      <div style="flex:1 1 160px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;border-left:3px solid #FAAD14;">
+        <div style="font-weight:600;">Root</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">su -c settings / cmd notification …</div>
+      </div>
+      <div style="flex:1 1 160px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;border-left:3px solid #A3D5E8;">
+        <div style="font-weight:600;">Shizuku</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">:shizuku 进程 UserService 以 shell 权限执行命令 · 仅 Android 7.0+ 可用，低版本通道静态禁用</div>
+      </div>
+      <div style="flex:1 1 160px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;border-left:3px solid #D9D9D9;">
+        <div style="font-weight:600;">无通道（降级）</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">跳转系统设置手动开启 · 通知 0/1 档仍可拦截</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第3层：核心引擎 -->
+  <div style="border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:10px 12px;margin:6px 0;background:rgba(163,213,232,0.12);">
+    <div style="font-size:12px;font-weight:600;padding-bottom:6px;">③ 应用核心引擎（四大模块 · 已做内存/耗电优化）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <div style="flex:1 1 170px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;">
+        <div style="font-weight:600;">SelfGuardService（前台）</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">ContentObserver 监听 Settings.Secure 数据库变更（零轮询省电）→ 检测到本应用无障碍被关闭 → 延迟 1 秒 → 写回拉起 · Android 14+ 声明 specialUse 前台服务类型</div>
+      </div>
+      <div style="flex:1 1 170px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;">
+        <div style="font-weight:600;">SelfAccessService + KeepAliveEngine</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">窗口事件驱动 + 低频巡检（默认 30s）→ 判定掉线 → 后台无感拉起 · 单应用冷却防循环 · 空名单零调度 · 图标/扫描双缓存省内存</div>
+      </div>
+      <div style="flex:1 1 170px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;">
+        <div style="font-weight:600;">NotifGateService（通知使用权）</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">每应用 0-5 级：0 拦截 / 1 静默 / 2 低 / 3 标准 / 4 高 / 5 最高（精细升降级需通道 + Android 14+，低版本自动放行不崩溃）</div>
+      </div>
+      <div style="flex:1 1 170px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;">
+        <div style="font-weight:600;">DevOptions + WatchdogService</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">开发者选项直写（直写 → Root/Shizuku 兜底，Settings 持久化永久生效）· 服务级保活看门狗周期巡检 · 动画档位滑杆 0-10</div>
+      </div>
+      <div style="flex:1 1 170px;min-width:0;background:#FFFFFF;border-radius:10px;padding:8px 10px;font-size:12.5px;">
+        <div style="font-weight:600;">无障碍权限总控 + 权限管理（v1.2）</div>
+        <div style="color:#6B7280;font-size:11.5px;margin-top:2px;">全机无障碍服务开关 + 锁定自动恢复（并入 ContentObserver 自监控）· 权限狗式危险权限组查看与 pm grant/revoke（Root/Shizuku）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第4层：自监控闭环 -->
+  <div style="border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:10px 12px;margin:6px 0;background:rgba(255,255,255,0.6);">
+    <div style="font-size:12px;font-weight:600;padding-bottom:8px;">④ 自监控闭环（ContentObserver，无轮询）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;">
+      <div style="background:#FFFFFF;border-radius:20px;padding:6px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">Settings.Secure 变更回调</div>
+      <div style="color:#6B7280;font-size:14px;">→</div>
+      <div style="background:#FFFFFF;border-radius:20px;padding:6px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">本组件是否还在启用串</div>
+      <div style="color:#6B7280;font-size:14px;">→</div>
+      <div style="background:#FFFFFF;border-radius:20px;padding:6px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">延迟 1s（可配 0.5-10s）</div>
+      <div style="color:#6B7280;font-size:14px;">→</div>
+      <div style="background:#FFFFFF;border-radius:20px;padding:6px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">经通道写回 + accessibility_enabled=1</div>
+    </div>
+    <div style="text-align:center;color:#6B7280;font-size:11.5px;padding-top:8px;">↺ 被用户/系统关闭 → 延迟 1 秒立即拉起；无通道时通知并跳转系统设置（系统限制，无法静默自启）</div>
+  </div>
+
+  <!-- 第5层：应用保活闭环 -->
+  <div style="border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:10px 12px;margin:6px 0;background:rgba(255,255,255,0.6);">
+    <div style="font-size:12px;font-weight:600;padding-bottom:8px;">⑤ 应用保活闭环（v1.4：掉线立即拉起 → 100ms 返回，后台无感）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;">
+      <div style="background:#FFFFFF;border-radius:20px;padding:6px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">多级存活判定（窗口事件 30s → UsageStats → 进程/pidof）</div>
+      <div style="color:#6B7280;font-size:14px;">→</div>
+      <div style="background:#FFFFFF;border-radius:20px;padding:6px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">判定掉线且策略放行（黑屏开关·低电量·10s 前台硬约束）</div>
+      <div style="color:#6B7280;font-size:14px;">→</div>
+      <div style="background:#FFFFFF;border-radius:20px;padding:6px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">无障碍上下文 startActivity 立即拉起</div>
+      <div style="color:#6B7280;font-size:14px;">→</div>
+      <div style="background:#FFFFFF;border-radius:20px;padding:6px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">100ms 后返回（切回上一应用/停留/回桌面，用户可选）</div>
+    </div>
+    <div style="text-align:center;color:#6B7280;font-size:11.5px;padding-top:8px;">↺ 存活判定 10 秒缓存省电 · 用户最近 10 秒切前台不拉（防打断）· 单应用冷却防循环 · 低电量自动暂停 · 黑屏也保活可开关</div>
+  </div>
+
+  <!-- UI 层 -->
+  <div style="border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:10px 12px;margin:6px 0;background:rgba(163,213,232,0.12);">
+    <div style="font-size:12px;font-weight:600;padding-bottom:6px;">⑥ 应用 UI（Material3 · 5 个导航页）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+      <span style="background:#FFFFFF;border-radius:16px;padding:4px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">首页（自监控开关·延迟滑杆·服务状态·统计·入口）</span>
+      <span style="background:#FFFFFF;border-radius:16px;padding:4px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">保活（全机应用扫描·搜索·勾选·使用情况访问引导·单点拉起）</span>
+      <span style="background:#FFFFFF;border-radius:16px;padding:4px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">通知（0-5 级滑杆·拦截统计·重置）</span>
+      <span style="background:#FFFFFF;border-radius:16px;padding:4px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">开发者（免跳转直改·0-10 档·一键模式）</span>
+      <span style="background:#FFFFFF;border-radius:16px;padding:4px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">实验（降频·策略·自检工具·关于）</span>
+      <span style="background:#FFFFFF;border-radius:16px;padding:4px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">服务管理 / 事件监控 / 授权向导（首页入口）</span>
+      <span style="background:#FFFFFF;border-radius:16px;padding:4px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">无障碍权限（开关·锁定）/ 权限管理（系统级·v1.2 入口）</span>
+      <span style="background:#FFFFFF;border-radius:16px;padding:4px 10px;font-size:12px;border:1px solid rgba(0,0,0,0.08);">快捷磁贴 + 桌面小部件 + 备份恢复</span>
+    </div>
+  </div>
+
+  <!-- 构建/兼容注脚 -->
+  <div style="font-size:11px;color:#6B7280;padding:6px 2px 0;line-height:1.7;">
+    构建：minSdk 21 / targetSdk 34 · R8 混淆 + 资源压缩 + 仅中英语言 → release 1.86MB（原 6.3MB，-70%）· release.keystore 签名 + zipalign 4。
+    兼容性：所有 API 21+ 调用带版本守卫（getColor/activeNotifications/getUid/Process.waitFor(超时)/通知监听 API 等），低版本自动降级不闪退。
+    服务合并：自监控（ContentObserver）与看门狗互斥，任意时刻最多 1 个保活前台服务。
+  </div>
+</div>
+</html>

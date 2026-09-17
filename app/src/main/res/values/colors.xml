@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Material 3 主色：现代蓝 -->
+    <color name="ic_launcher_bg">#2563EB</color>
+    <color name="primary">#2563EB</color>
+    <color name="primary_dark">#1E40AF</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="primary_container">#DBEAFE</color>
+    <color name="on_primary_container">#1E3A8A</color>
+    <color name="secondary">#059669</color>
+    <color name="on_secondary">#FFFFFF</color>
+    <color name="secondary_container">#D1FAE5</color>
+    <color name="on_secondary_container">#064E3B</color>
+    <color name="surface_variant">#EEF1F6</color>
+    <color name="on_surface_variant">#44474E</color>
+    <color name="outline">#74777F</color>
+    <color name="accent">#00A36C</color>
+    <color name="status_ok">#2E7D32</color>
+    <color name="status_warn">#F57C00</color>
+    <color name="status_err">#C62828</color>
+    <color name="chip_bg">#E8F0FE</color>
+    <color name="chip_bg_dark">#1E3A5F</color>
+    <color name="chip_text">#174EA6</color>
+    <color name="chip_text_dark">#AECBFA</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="card_bg">#F8FAFC</color>
+    <color name="status_muted">#9E9E9E</color>
+    <!-- 桌面小部件文字（夜间在 values-night 覆盖） -->
+    <color name="widget_text">#1A1B1C</color>
+    <color name="widget_text_sub">#6B7280</color>
+</resources>

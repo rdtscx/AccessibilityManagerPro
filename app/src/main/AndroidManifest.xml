@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 通过 adb shell pm grant 授予后，可直写无障碍开关；Shizuku/Root 通道无需此权限 -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- 库 minSdk 放行：Shizuku API 库要求 24，但代码层已在 API 21-23 硬性禁用 Shizuku 通道，
+         仅当系统 >= 24 时才会调用 Shizuku，故 overrideLibrary 安全 -->
+    <uses-sdk
+        android:minSdkVersion="21"
+        tools:overrideLibrary="rikka.shizuku.api,rikka.shizuku.shared,rikka.shizuku.aidl" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Android 14+ 启动 specialUse 前台服务所需权限 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+        tools:targetApi="34" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- 应用保活：需要枚举全机用户/系统软件（Android 11+ 必须显式声明） -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <!-- 应用保活：判断目标软件是否存活（前台/后台活动事件），需用户在系统设置中授权"使用情况访问" -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+    <application
+        android:name=".App"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AccessibilityManagerPro">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.ServiceDetailActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.GuideActivity"
+            android:exported="false" />
+
+        <!-- 应用无障碍权限总控：全机无障碍服务开关 + 锁定自动拉起 -->
+        <activity
+            android:name=".ui.AccessibilityPermActivity"
+            android:exported="false" />
+
+        <!-- 权限管理器（类似权限狗）：系统级权限查看与修改 -->
+        <activity
+            android:name=".ui.PermissionManagerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.PermissionDetailActivity"
+            android:exported="false" />
+
+        <!-- 本应用的无障碍服务：低耗电（不读屏幕内容），事件驱动感知前台；被关闭后由自监控延迟 1 秒拉起 -->
+        <service
+            android:name=".selfguard.SelfAccessService"
+            android:exported="true"
+            android:label="@string/self_access_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- 自监控前台服务：ContentObserver 监听 Settings.Secure 数据库变更（零轮询、低耗电） -->
+        <service
+            android:name=".selfguard.SelfGuardService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            tools:targetApi="34">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="self_accessibility_guard" />
+        </service>
+
+        <!-- 通知 0-5 级调控：通知使用权（NotificationListenerService），拦截/静默/精细调控 -->
+        <service
+            android:name=".notif.NotifGateService"
+            android:exported="true"
+            android:label="@string/notif_listener_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- 保活看门狗：前台服务，周期巡检无障碍服务开关 -->
+        <service
+            android:name=".watchdog.WatchdogService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            tools:targetApi="34">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="accessibility_service_keep_alive" />
+        </service>
+
+        <!-- Shizuku UserService：运行在 Shizuku 进程，用于执行系统命令 -->
+        <service
+            android:name=".shizuku.CommandService"
+            android:exported="false"
+            android:process=":shizuku" />
+
+        <!-- 快捷设置磁贴：一键启停常用无障碍服务 -->
+        <service
+            android:name=".quick.QuickToggleTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".watchdog.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".quick.QuickToggleWidget"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
+    </application>
+</manifest>

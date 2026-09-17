@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">无障碍管理器Pro</string>
+    <string name="tile_label">无障碍开关</string>
+    <string name="widget_label">无障碍快捷开关</string>
+
+    <!-- Bottom nav -->
+    <string name="tab_services">服务</string>
+    <string name="tab_monitor">监控</string>
+    <string name="tab_settings">设置</string>
+
+    <!-- Status card -->
+    <string name="status_title">授权状态</string>
+    <string name="status_channel_none">未授权 · 需 Root / Shizuku / ADB</string>
+    <string name="status_channel_app">已授权 (WRITE_SECURE_SETTINGS)</string>
+    <string name="status_channel_root">已获得 Root 权限</string>
+    <string name="status_channel_shizuku">已连接 Shizuku</string>
+    <string name="status_go_guide">授权向导</string>
+    <string name="status_shizuku_ready">Shizuku：已授权，通道可用</string>
+    <string name="status_shizuku_no_perm">Shizuku：已连接，但未授权本应用</string>
+    <string name="status_shizuku_not_connected">Shizuku：已安装，未启动</string>
+    <string name="status_shizuku_not_installed">Shizuku：未安装（可前往授权向导）</string>
+    <string name="status_shizuku_low_api">Shizuku：需 Android 7.0+</string>
+    <string name="status_shizuku_grant">一键授权 Shizuku</string>
+    <string name="status_shizuku_start">去启动 Shizuku</string>
+    <string name="status_watchdog">保活看门狗</string>
+    <string name="search_hint">搜索服务名称或包名…</string>
+    <string name="empty_services">未发现无障碍服务</string>
+    <string name="service_count">%1$d 个服务 · 已启用 %2$d</string>
+    <string name="refresh">刷新</string>
+
+    <!-- Capabilities -->
+    <string name="cap_read_screen">读取屏幕</string>
+    <string name="cap_gestures">模拟手势</string>
+    <string name="cap_keys">按键过滤</string>
+    <string name="cap_screenshot">截屏</string>
+    <string name="cap_magnify">放大控制</string>
+    <string name="cap_touch">触控探索</string>
+    <string name="cap_web">网页增强</string>
+    <string name="cap_other">其他</string>
+
+    <!-- Detail -->
+    <string name="detail_enabled">已启用</string>
+    <string name="detail_disabled">未启用</string>
+    <string name="detail_package">包名</string>
+    <string name="detail_component">组件</string>
+    <string name="detail_summary">摘要</string>
+    <string name="detail_description">说明</string>
+    <string name="detail_capabilities">能力</string>
+    <string name="detail_settings_activity">内置设置页</string>
+    <string name="detail_actions">操作</string>
+    <string name="action_enable">启用服务</string>
+    <string name="action_disable">停用服务</string>
+    <string name="action_open_app">应用信息</string>
+    <string name="action_sys_settings">系统无障碍设置</string>
+    <string name="action_open_settings_activity">打开内置设置</string>
+    <string name="keep_alive">加入保活列表</string>
+    <string name="keep_alive_summary">被系统重置后自动恢复该服务</string>
+    <string name="no_settings_activity">该服务未提供内置设置页</string>
+    <string name="detail_risk_title">安全提示</string>
+    <string name="detail_risk_body">无障碍服务可读取屏幕上显示的内容（包括账号、验证码等敏感信息），仅应启用可信来源的服务。</string>
+    <string name="result_ok">操作成功</string>
+    <string name="result_fail">操作失败：%1$s</string>
+    <string name="result_no_change">状态未发生变化</string>
+
+    <!-- Monitor -->
+    <string name="monitor_title">事件监控</string>
+    <string name="monitor_empty">暂无事件记录</string>
+    <string name="monitor_clear">清空记录</string>
+    <string name="monitor_clear_confirm">确定清空全部事件记录？</string>
+    <string name="event_enable">启用</string>
+    <string name="event_disable">停用</string>
+    <string name="event_lost">丢失</string>
+    <string name="event_restored">自动恢复</string>
+    <string name="event_warn">警告</string>
+    <string name="event_service">服务</string>
+
+    <!-- Settings -->
+    <string name="settings_watchdog">保活看门狗</string>
+    <string name="settings_watchdog_summary">周期检查无障碍服务开关，被系统重置时自动恢复</string>
+    <string name="settings_interval">巡检间隔</string>
+    <string name="settings_interval_30s">30 秒</string>
+    <string name="settings_interval_1m">1 分钟</string>
+    <string name="settings_interval_5m">5 分钟</string>
+    <string name="settings_protected">保活名单</string>
+    <string name="settings_protected_empty">未选择任何服务</string>
+    <string name="settings_protected_count">%1$d 个服务</string>
+    <string name="settings_tile_target">磁贴目标服务</string>
+    <string name="settings_tile_target_none">未选择（点击磁贴打开引导）</string>
+    <string name="settings_data">数据管理</string>
+    <string name="settings_backup">导出配置</string>
+    <string name="settings_restore">导入配置</string>
+    <string name="settings_clear_log">清空事件记录</string>
+    <string name="settings_theme">外观</string>
+    <string name="theme_system">跟随系统</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="settings_other">其他</string>
+    <string name="settings_disable_all">一键停用全部无障碍服务</string>
+    <string name="settings_disable_all_confirm">确定停用全部无障碍服务？该操作会立即生效。</string>
+    <string name="settings_about">关于</string>
+    <string name="settings_language">语言</string>
+    <string name="lang_zh">简体中文</string>
+    <string name="lang_en">English</string>
+    <string name="backup_done">配置已导出</string>
+    <string name="restore_done">配置已导入</string>
+    <string name="restore_fail">导入失败：%1$s</string>
+
+    <!-- Guide -->
+    <string name="guide_title">授权向导</string>
+    <string name="guide_intro">启用、停用与保活无障碍服务需要写系统安全设置。三种方式任选其一：</string>
+    <string name="guide_root">Root 通道</string>
+    <string name="guide_root_desc">设备已 Root 时自动使用 su 命令，无需额外操作。</string>
+    <string name="guide_root_ok">已检测到 Root</string>
+    <string name="guide_root_fail">未检测到 Root</string>
+    <string name="guide_shizuku">Shizuku 通道</string>
+    <string name="guide_shizuku_desc">需安装 Shizuku 应用并启动服务，在本应用内授权。</string>
+    <string name="guide_shizuku_install">安装 Shizuku</string>
+    <string name="guide_shizuku_start">启动 Shizuku</string>
+    <string name="guide_shizuku_grant">授权</string>
+    <string name="guide_shizuku_ok">已连接并授权</string>
+    <string name="guide_adb">ADB 通道</string>
+    <string name="guide_adb_desc">电脑执行 adb 命令授予 WRITE_SECURE_SETTINGS 后，应用可直接写开关。无线调试请配合配对码。</string>
+    <string name="guide_adb_cmd">复制命令</string>
+    <string name="guide_adb_copy_done">已复制</string>
+    <string name="guide_adb_ok">已检测到授权</string>
+    <string name="guide_check">重新检测</string>
+    <string name="guide_checking">检测中…</string>
+    <string name="guide_done">任一通道就绪即可开始使用；未就绪时应用仍可跳转系统设置页手动开关。</string>
+
+    <!-- Misc -->
+    <string name="about_version">版本 %1$s</string>
+    <string name="about_body">一款开源的无障碍服务管理器：集中查看、启停、保活设备上的无障碍服务，支持 Root / Shizuku / ADB 三种授权通道。仅供合法用途，请仅启用可信服务。</string>
+    <string name="ok">确定</string>
+    <string name="cancel">取消</string>
+    <string name="back">返回</string>
+    <string name="watchdog_notif_title">保活看门狗运行中</string>
+    <string name="watchdog_notif_text">正在保护 %1$d 个无障碍服务</string>
+    <string name="watchdog_notif_stop">停止</string>
+    <string name="watchdog_restored_notif">已自动恢复 %1$d 个被重置的服务</string>
+    <string name="watchdog_fail_notif">%1$d 个服务恢复失败，请检查授权通道</string>
+    <string name="notification_channel_watchdog">保活通知</string>
+    <string name="notification_permission_denied">通知权限未开启，保活仍会运行</string>
+    <string name="select_service">选择服务</string>
+    <string name="none">无</string>
+    <string name="enabled_count_badge">%1$d 启用</string>
+
+    <!-- Bottom nav（新版） -->
+    <string name="tab_home">首页</string>
+    <string name="tab_keepalive">保活</string>
+    <string name="tab_notif">通知</string>
+    <string name="tab_dev">开发者</string>
+    <string name="tab_exp">实验</string>
+
+    <!-- 自监控与无障碍服务 -->
+    <string name="self_access_service_label">无障碍自监控服务</string>
+    <string name="self_access_service_desc">仅监听窗口切换事件，不读取屏幕内容（低耗电）。当该服务被关闭时，自监控会在延迟后自动尝试恢复。</string>
+    <string name="home_self_access_title">无障碍服务（本应用）</string>
+    <string name="home_self_access_desc">低耗电模式：只监听窗口事件，不读取屏幕内容。作为自监控目标与保活事件源。</string>
+    <string name="status_checking">检测中…</string>
+    <string name="home_enable">去开启</string>
+    <string name="self_access_on">无障碍服务已开启</string>
+    <string name="self_access_off">无障碍服务已关闭</string>
+    <string name="self_access_on_short">已开启</string>
+    <string name="home_self_guard_title">无障碍自监控（低耗电）</string>
+    <string name="home_self_guard_desc">ContentObserver 监听 Settings.Secure 数据库变更，零轮询。检测到本应用无障碍被关闭后，延迟指定秒数立即拉起。</string>
+    <string name="home_self_guard_delay">检测到关闭后延迟</string>
+    <string name="self_guard_delay_value">%.1f 秒</string>
+    <string name="self_guard_enabled_toast">自监控已启动（常驻前台服务）</string>
+    <string name="notification_channel_self_guard">自监控通知</string>
+    <string name="self_guard_notif_title">无障碍自监控运行中</string>
+    <string name="self_guard_notif_text">监听 Settings.Secure 变更，被关闭后自动拉起</string>
+    <string name="self_guard_guide_title">无障碍权限被关闭</string>
+    <string name="self_guard_guide_text">自监控检测到本应用无障碍被关闭，但当前无 Root/Shizuku/ADB 通道，请手动开启（系统限制）。</string>
+
+    <!-- 应用保活 -->
+    <string name="keepalive_log_relaunched">已后台无感拉起（第 %1$d 次）</string>
+    <string name="search_app_hint">搜索应用名或包名…</string>
+    <string name="filter_all">全部</string>
+    <string name="filter_user">用户应用</string>
+    <string name="filter_system">系统应用</string>
+    <string name="filter_protected">已保活</string>
+    <string name="keepalive_summary">共 %1$d 个应用 · 保活 %2$d 个 · 今日拉起 %3$d 次</string>
+    <string name="keepalive_hint">勾选即加入保活：掉线/被停止后自动后台无感拉起。建议授予"使用情况访问"以精准判定存活。</string>
+    <string name="keepalive_blackscreen_title">黑屏时也保活</string>
+    <string name="keepalive_blackscreen_desc">熄屏状态下被杀后台时，是否照常拉起保活应用（默认开启）</string>
+    <string name="keepalive_blackscreen_on">已开启：黑屏时也保活</string>
+    <string name="keepalive_blackscreen_off">已关闭：黑屏时不保活（省电）</string>
+    <string name="keepalive_return_title">拉起后返回方案</string>
+    <string name="keepalive_return_desc">保活应用被拉起 100ms 后，如何回到你的上一个软件</string>
+    <string name="keepalive_return_prev">切回上一个软件（无感，推荐）</string>
+    <string name="keepalive_return_stay">停留在被拉起应用</string>
+    <string name="keepalive_return_home">返回桌面</string>
+    <string name="keepalive_return_prev_short">切回上一软件</string>
+    <string name="keepalive_return_stay_short">停留</string>
+    <string name="keepalive_return_home_short">回桌面</string>
+    <string name="keepalive_grant_usage">授予使用情况访问</string>
+    <string name="usage_open_failed">无法打开使用情况访问设置</string>
+    <string name="action_relaunch">立即拉起</string>
+    <string name="action_protect">加入保活</string>
+    <string name="cd_app_icon">应用图标</string>
+    <string name="app_state_foreground">前台使用中</string>
+    <string name="app_state_running">运行中</string>
+    <string name="app_state_stopped">已停止</string>
+    <string name="app_state_relaunched">已发起拉起</string>
+    <string name="app_state_relaunch_failed">拉起失败</string>
+
+    <!-- 通知 0-5 级调控 -->
+    <string name="notif_listener_label">通知调控服务</string>
+    <string name="notif_grant_access">授予通知使用权</string>
+    <string name="notif_access_ok">通知使用权已授予</string>
+    <string name="notif_access_need">未授予通知使用权：0 屏蔽 / 1 静默不可用</string>
+    <string name="notif_hint_fine">已具备精细调控能力（Android 14+）：2/4/5 档会升降级对方通知重要性；0/1 档由监听器直接拦截。</string>
+    <string name="notif_hint_no_priv">无 Root/Shizuku/ADB 通道：0/1 档（拦截/静默）可用，2/4/5 档仅放行。建议完成授权向导。</string>
+    <string name="notif_hint_api">精细调控需 Android 14+；当前系统仅 0/1 档拦截可用，2/4/5 档放行。</string>
+    <string name="notif_count">已为 %1$d 款应用设置等级</string>
+    <string name="notif_reset_all">全部重置</string>
+    <string name="notif_reset_done">已重置为默认（3 标准）</string>
+    <string name="notif_open_failed">无法打开通知使用权设置</string>
+    <string name="notif_level_0">0 · 完全屏蔽</string>
+    <string name="notif_level_1">1 · 静默收纳</string>
+    <string name="notif_level_2">2 · 低打扰</string>
+    <string name="notif_level_3">3 · 标准</string>
+    <string name="notif_level_4">4 · 高亮</string>
+    <string name="notif_level_5">5 · 最高</string>
+    <string name="notif_level_0_desc">拦截并取消该应用全部通知</string>
+    <string name="notif_level_1_desc">拦截取消并记录历史（可在实验页关闭记录）</string>
+    <string name="notif_level_2_desc">放行；有授权通道时降为低重要性</string>
+    <string name="notif_level_3_desc">系统默认，不干预</string>
+    <string name="notif_level_4_desc">放行；有授权通道时提升为高重要性</string>
+    <string name="notif_level_5_desc">放行；有授权通道时提升为最高重要性</string>
+
+    <!-- 开发者选项映射 -->
+    <string name="dev_hint">直接读写系统开发者选项（Settings 持久化，重启后永久生效）。受保护键需要 Root / Shizuku / ADB 授权通道。</string>
+    <string name="dev_preset_fast">极速模式</string>
+    <string name="dev_preset_extreme">极致模式</string>
+    <string name="dev_preset_default">恢复默认</string>
+    <string name="dev_switch_enabled">开发者选项开关</string>
+    <string name="dev_switch_enabled_desc">启用系统开发者选项（部分机型需开启后修改才长期生效）</string>
+    <string name="dev_window_anim">窗口动画缩放</string>
+    <string name="dev_window_anim_desc">窗口打开/关闭动画速度</string>
+    <string name="dev_transition_anim">过渡动画缩放</string>
+    <string name="dev_transition_anim_desc">页面切换动画速度</string>
+    <string name="dev_animator_dur">动画程序时长缩放</string>
+    <string name="dev_animator_dur_desc">系统动画时长倍率</string>
+    <string name="dev_always_finish">不保留活动</string>
+    <string name="dev_always_finish_desc">用户离开后立即销毁 Activity（内存紧张时可用，会拖慢应用启动）</string>
+    <string name="dev_force_gpu">强制 GPU 渲染</string>
+    <string name="dev_force_gpu_desc">强制应用使用 GPU 进行 2D 绘制（部分应用重启后生效）</string>
+    <string name="dev_strict_mode">严格模式</string>
+    <string name="dev_strict_mode_desc">主线程繁忙时屏幕闪烁提示（仅调试用）</string>
+    <string name="dev_show_touches">显示指针位置</string>
+    <string name="dev_show_touches_desc">屏幕显示触摸坐标与轨迹</string>
+    <string name="dev_on">开</string>
+    <string name="dev_off">关</string>
+    <string name="dev_current">当前值：%1$s</string>
+    <string name="dev_write_ok">已生效（%1$s）</string>
+    <string name="dev_write_fail">写入失败：需要授权通道</string>
+    <string name="dev_write_fail_toast">写入失败，请先在授权向导中完成 Root/Shizuku/ADB 授权（%1$s）</string>
+    <string name="dev_saved">已保存并永久生效</string>
+    <string name="dev_preset_ok">%1$s已全部应用</string>
+    <string name="dev_preset_fail">预设应用失败：请先完成授权向导</string>
+    <string name="dev_preset_partial">%1$s部分应用（%2$d/%3$d），请检查授权通道</string>
+
+    <!-- 实验能力 -->
+    <string name="exp_hint">实验能力：按需开启/关闭，立即生效。</string>
+    <string name="exp_throttle">事件采样降频</string>
+    <string name="exp_throttle_desc">窗口事件间隔小于该值直接忽略（0 = 不过滤）。调大更省电。</string>
+    <string name="exp_throttle_value">%1$d ms</string>
+    <string name="exp_screenoff_only">仅屏幕关闭时拉活</string>
+    <string name="exp_screenoff_only_desc">关闭后允许随时拉起（可能打断用户操作）；开启时仅在熄屏或闲置 3 分钟后无感拉起</string>
+    <string name="exp_low_battery">低电量暂停保活</string>
+    <string name="exp_low_battery_desc">电量 ≤15% 时停止拉起，省电优先</string>
+    <string name="exp_interval">保活巡检间隔</string>
+    <string name="exp_interval_value">%1$d 秒</string>
+    <string name="exp_notif_history">通知拦截历史</string>
+    <string name="exp_notif_history_desc">记录 0/1 档拦截的通知（最多 200 条，本地存储）</string>
+    <string name="exp_notif_override">精细调控通道</string>
+    <string name="exp_notif_override_desc">尝试用系统命令升降级通知重要性（需 Root/Shizuku/ADB + Android 14+）</string>
+    <string name="exp_tools">自检与工具</string>
+    <string name="exp_root_check">检测 Root 权限</string>
+    <string name="exp_root_yes">已检测到 Root 权限</string>
+    <string name="exp_root_no">未检测到 Root 权限（可用 Shizuku / ADB 替代）</string>
+    <string name="exp_relaunch_test">测试拉起首个保活应用</string>
+    <string name="exp_no_protected">请先在保活页勾选应用</string>
+    <string name="exp_relaunch_ok">已发起拉起：%1$s</string>
+    <string name="exp_relaunch_fail">拉起失败：%1$s</string>
+    <string name="exp_about">无障碍管理器 Pro v%1$s · Android API %2$d\n低耗电无障碍管理 · 应用保活 · 通知 0-5 级调控 · 开发者选项映射</string>
+    <string name="exp_self_access">无障碍服务：%1$s</string>
+    <string name="exp_channel">授权通道：%1$s</string>
+    <string name="exp_usage_access">使用情况访问：%1$s</string>
+    <string name="exp_notif_listener">通知使用权：%1$s</string>
+    <string name="exp_stats">保活 %1$d · 今日拉起 %2$d · 拦截通知 %3$d</string>
+    <string name="exp_yes">已授予</string>
+    <string name="exp_no">未授予</string>
+
+    <!-- 首页统计 -->
+    <string name="home_stats">今日统计</string>
+    <string name="home_stat_protected">保活中</string>
+    <string name="home_stat_relaunch">今日拉起</string>
+    <string name="home_stat_block">拦截通知</string>
+    <string name="home_entries">快捷入口</string>
+
+    <!-- 无障碍权限总控 -->
+    <string name="accperm_entry_title">无障碍权限（应用开关 · 锁定）</string>
+    <string name="accperm_title">无障碍权限</string>
+    <string name="accperm_desc">列出全机已安装的无障碍服务（用户/系统）。开关直接启用或停用；点亮锁定后，该服务被关闭会自动无感拉起。</string>
+    <string name="accperm_count">共 %1$d 个无障碍服务</string>
+    <string name="accperm_banner_none">未授权通道：开关需在系统设置中手动完成；锁定后服务被关闭时，应用会引导开启。</string>
+    <string name="accperm_banner_app">通道：%1$s（可直写开关；锁定后自动拉起生效）</string>
+    <string name="accperm_banner_shell">通道：%1$s（可直写开关；锁定后服务被关闭将自动无感拉起）</string>
+    <string name="accperm_self_tag">本应用</string>
+    <string name="accperm_system_tag">系统</string>
+    <string name="accperm_user_tag">用户</string>
+    <string name="accperm_locked_hint">已锁定 · 关闭自动拉起</string>
+    <string name="accperm_lock_hint">点按锁定</string>
+    <string name="accperm_lock">锁定</string>
+    <string name="accperm_switch">启用开关</string>
+    <string name="accperm_enter">进入</string>
+    <string name="accperm_pkg_tag">%1$s · %2$s</string>
+    <string name="accperm_toggle_ok">已修改：%1$s</string>
+    <string name="accperm_toggle_fail">修改失败：%1$s（需授权通道，将打开系统设置）</string>
+    <string name="accperm_locked">已锁定：关闭后自动无感拉起</string>
+    <string name="accperm_unlocked">已解锁</string>
+    <string name="accperm_no_desc">该服务没有描述</string>
+    <string name="accperm_sheet_subtitle">%1$s · 服务 %2$s</string>
+    <string name="accperm_opt_lock">锁定保活（被关闭后自动无感拉起）</string>
+    <string name="accperm_opt_boot">开机启动保活（开机后自动恢复此服务）</string>
+    <string name="accperm_opt_toast">显示 Toast 保活提示（全局）</string>
+    <string name="accperm_opt_delay">延迟一秒保活（全局）</string>
+    <string name="accperm_opt_user_only">只显示用户应用（本页）</string>
+    <string name="accperm_opt_hide_card">隐藏后台卡片</string>
+    <string name="accperm_opt_hide_card_note">需系统级能力，当前版本暂不可用</string>
+    <string name="accperm_opt_text">自定义通知文字（全局）</string>
+    <string name="accperm_delay_title">保活拉起延迟</string>
+    <string name="accperm_delay_desc">自监控检测到服务被关闭后，延迟多久自动恢复（默认 1.0 秒）。</string>
+    <string name="accperm_delay_saved">延迟已保存</string>
+    <string name="accperm_boot_on">已加入开机启动保活：%1$s</string>
+    <string name="accperm_boot_off">已移出开机启动保活：%1$s</string>
+    <string name="accperm_toast_on">已开启保活 Toast 提示</string>
+    <string name="accperm_toast_off">已关闭保活 Toast 提示</string>
+    <string name="accperm_text_hint">输入自定义保活提示文字（留空使用默认）</string>
+    <string name="accperm_text_saved">提示文字已保存</string>
+    <string name="accperm_text_empty">默认文案</string>
+    <string name="keepalive_toast_default">已为你拉起 %1$s</string>
+
+    <!-- 权限管理器（类似权限狗） -->
+    <string name="permmgr_entry_title">权限管理（系统级）</string>
+    <string name="permmgr_title">权限管理</string>
+    <string name="permmgr_desc">点开软件查看/修改系统级权限（危险权限组）。修改经 Root / Shizuku / ADB 执行，立即生效并持久保存。</string>
+    <string name="permmgr_banner_none">未授权通道：仅可查看应用列表；修改需 Root / Shizuku 或 ADB。</string>
+    <string name="permmgr_banner_app">当前为 ADB 写安全设置通道：进入详情可复制 ADB 命令手动执行。</string>
+    <string name="permmgr_banner_shell">通道：%1$s —— 可系统级直接修改权限。</string>
+    <string name="permdetail_title">权限详情</string>
+    <string name="permdetail_banner_shell">Root / Shizuku 通道已启用：开关直接系统级修改，立即生效。</string>
+    <string name="permdetail_banner_none">无 Root / Shizuku 通道：开关不可用，请用 ADB 执行（可一键复制全部命令）。</string>
+    <string name="permdetail_copy_adb">复制全部 ADB 命令</string>
+    <string name="permdetail_copied">已复制全部 ADB 命令</string>
+    <string name="permdetail_toggle_ok">已修改：%1$s</string>
+    <string name="permdetail_toggle_fail">修改失败：%1$s（需 Root / Shizuku）</string>
+    <string name="permdetail_granted">已授予</string>
+    <string name="permdetail_not_granted">未授予</string>
+    <string name="permdetail_adb_hint">需 ADB 执行</string>
+    <string name="permdetail_switch">权限开关</string>
+</resources>
