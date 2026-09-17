@@ -121,8 +121,16 @@
     <string name="guide_checking">Checking…</string>
     <string name="guide_done">Any ready channel works. Without one, the app still falls back to the system settings page.</string>
     <string name="guide_auto_enter">Authorization ready, entering home</string>
+    <string name="guide_enter_home">Enter home</string>
+    <string name="guide_ready">Ready</string>
+    <string name="guide_not_ready">Not ready</string>
     <string name="exp_doze_mode">Screen-off doze</string>
     <string name="exp_doze_mode_desc">Pause app keepalive and slow self-guard to 15min when screen off, auto-resume on screen on — saves standby battery</string>
+    <string name="exp_theme">Theme</string>
+    <string name="exp_theme_desc">Choose light, dark or follow system — status bar color adapts automatically</string>
+    <string name="exp_theme_light">Light</string>
+    <string name="exp_theme_dark">Dark</string>
+    <string name="exp_theme_system">System</string>
 
     <string name="about_version">Version %1$s</string>
     <string name="about_body">An open-source accessibility service manager: view, toggle and keep alive accessibility services, with Root / Shizuku / ADB channels. For legitimate use only; only enable trusted services.</string>

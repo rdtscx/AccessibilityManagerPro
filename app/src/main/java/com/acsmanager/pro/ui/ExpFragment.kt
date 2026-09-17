@@ -8,6 +8,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.acsmanager.pro.BuildConfig
@@ -33,6 +34,8 @@ class ExpFragment : Fragment() {
 
     private var _binding: FragmentExpBinding? = null
     private val binding get() = _binding!!
+    /** 程序化切换开关时置 true，避免触发互斥逻辑造成循环。 */
+    private var programmaticSwitch = false
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -53,7 +56,15 @@ class ExpFragment : Fragment() {
         }
 
         binding.switchScreenoff.setOnCheckedChangeListener { _, checked ->
+            if (programmaticSwitch) return@setOnCheckedChangeListener
             Prefs.setKeepAliveScreenOffOnly(requireContext(), checked)
+            // 互斥：开启"仅屏幕关闭时拉活"时关闭"熄屏休眠省电"（二者逻辑冲突）
+            if (checked) {
+                Prefs.setDozeModeEnabled(requireContext(), false)
+                programmaticSwitch = true
+                binding.switchDoze.isChecked = false
+                programmaticSwitch = false
+            }
         }
 
         binding.switchLowbattery.setOnCheckedChangeListener { _, checked ->
@@ -61,7 +72,15 @@ class ExpFragment : Fragment() {
         }
 
         binding.switchDoze.setOnCheckedChangeListener { _, checked ->
+            if (programmaticSwitch) return@setOnCheckedChangeListener
             Prefs.setDozeModeEnabled(requireContext(), checked)
+            // 互斥：开启"熄屏休眠省电"时关闭"仅屏幕关闭时拉活"（二者逻辑冲突）
+            if (checked) {
+                Prefs.setKeepAliveScreenOffOnly(requireContext(), false)
+                programmaticSwitch = true
+                binding.switchScreenoff.isChecked = false
+                programmaticSwitch = false
+            }
         }
 
         binding.sliderInterval.addOnChangeListener { _, value, fromUser ->
@@ -76,6 +95,18 @@ class ExpFragment : Fragment() {
 
         binding.switchNotifOverride.setOnCheckedChangeListener { _, checked ->
             Prefs.setNotifOverrideEnabled(requireContext(), checked)
+        }
+
+        // 主题切换：白天 / 黑夜 / 跟随系统，立即生效
+        binding.themeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val mode = when (checkedId) {
+                R.id.btn_theme_light -> "light"
+                R.id.btn_theme_dark -> "dark"
+                else -> "system"
+            }
+            Prefs.setThemeMode(requireContext(), mode)
+            applyTheme(mode)
         }
 
         binding.btnRootCheck.setOnClickListener {
@@ -117,6 +148,16 @@ class ExpFragment : Fragment() {
         binding.switchNotifHistory.isChecked = Prefs.notifHistoryEnabled(requireContext())
         binding.switchNotifOverride.isChecked = Prefs.notifOverrideEnabled(requireContext())
 
+        // 初始化主题按钮选中状态
+        val themeBtn = when (Prefs.themeMode(requireContext())) {
+            "light" -> R.id.btn_theme_light
+            "dark" -> R.id.btn_theme_dark
+            else -> R.id.btn_theme_system
+        }
+        if (binding.themeToggle.checkedButtonId != themeBtn) {
+            binding.themeToggle.check(themeBtn)
+        }
+
         updateIntervalLabel()
         binding.sliderInterval.value = (Prefs.keepAliveIntervalMs(requireContext()) / 1000f)
             .coerceIn(10f, 300f)
@@ -141,6 +182,18 @@ class ExpFragment : Fragment() {
             R.string.exp_interval_value,
             Prefs.keepAliveIntervalMs(requireContext()) / 1000
         )
+    }
+
+    /** 应用主题模式并同步状态栏颜色。 */
+    private fun applyTheme(mode: String) {
+        val nightMode = when (mode) {
+            "light" -> AppCompatDelegate.MODE_NIGHT_NO
+            "dark" -> AppCompatDelegate.MODE_NIGHT_YES
+            else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        }
+        AppCompatDelegate.setDefaultNightMode(nightMode)
+        // Activity  recreate 后状态栏颜色由 MainActivity 统一设置
+        requireActivity().recreate()
     }
 
     private fun refreshSelfTest() {

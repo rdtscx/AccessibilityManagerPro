@@ -67,7 +67,6 @@ class DevFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         requireActivity().title = getString(R.string.tab_dev)
-        val ch = Privilege.bestChannel(requireContext())
         // 通道状态已体现在首页，这里通过 adapter 刷新当前值
         adapter.notifyDataSetChanged()
     }

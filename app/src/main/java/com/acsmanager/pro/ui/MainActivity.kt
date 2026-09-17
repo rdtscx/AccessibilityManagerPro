@@ -2,9 +2,11 @@ package com.acsmanager.pro.ui
 
 import android.content.ComponentName
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import com.acsmanager.pro.R
 import com.acsmanager.pro.core.AccessServiceRepo
@@ -30,6 +32,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
+        applyStatusBar()
 
         if (savedInstanceState == null) {
             showFragment(HomeFragment(), addToBack = false)
@@ -99,6 +102,34 @@ class MainActivity : AppCompatActivity() {
             .replace(R.id.container, fragment)
         if (addToBack) t.addToBackStack(null)
         t.commit()
+    }
+
+    /**
+     * 状态栏颜色跟随主题：浅色主题用浅色背景+深色图标，深色主题用深色背景+浅色图标。
+     * 避免状态栏与主界面颜色突兀。
+     */
+    private fun applyStatusBar() {
+        val isDark = when (Prefs.themeMode(this)) {
+            "light" -> false
+            "dark" -> true
+            else -> (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        }
+        window.statusBarColor = if (isDark) {
+            getColor(R.color.status_bar_dark)
+        } else {
+            getColor(R.color.status_bar_light)
+        }
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = !isDark
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyStatusBar()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyStatusBar()
     }
 
     override fun onDestroy() {

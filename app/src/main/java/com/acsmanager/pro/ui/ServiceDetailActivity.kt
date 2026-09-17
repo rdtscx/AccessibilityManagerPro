@@ -137,18 +137,16 @@ class ServiceDetailActivity : AppCompatActivity() {
         }
 
         binding.btnToggle.setOnClickListener {
-            val current = item ?: return@setOnClickListener
-            val enable = !AccessServiceRepo.enabledStrings(this).contains(current.flatten)
+            val enable = !AccessServiceRepo.enabledStrings(this@ServiceDetailActivity).contains(item.flatten)
             toggle(enable)
         }
 
         binding.keepAliveSwitch.setOnCheckedChangeListener { _, checked ->
-            val current = item ?: return@setOnCheckedChangeListener
-            val set = Prefs.protectedServices(this).toMutableSet()
-            if (checked) set.add(current.flatten) else set.remove(current.flatten)
-            Prefs.setProtectedServices(this, set)
-            if (checked && Prefs.isWatchdogEnabled(this)) {
-                com.acsmanager.pro.watchdog.WatchdogService.start(this)
+            val set = Prefs.protectedServices(this@ServiceDetailActivity).toMutableSet()
+            if (checked) set.add(item.flatten) else set.remove(item.flatten)
+            Prefs.setProtectedServices(this@ServiceDetailActivity, set)
+            if (checked && Prefs.isWatchdogEnabled(this@ServiceDetailActivity)) {
+                com.acsmanager.pro.watchdog.WatchdogService.start(this@ServiceDetailActivity)
             }
         }
 

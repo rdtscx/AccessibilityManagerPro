@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -11,6 +12,7 @@ import android.os.Looper
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import com.acsmanager.pro.R
 import com.acsmanager.pro.core.Privilege
 import com.acsmanager.pro.databinding.ActivityGuideBinding
@@ -20,7 +22,7 @@ import rikka.shizuku.Shizuku
 /**
  * 授权向导：Root / Shizuku / ADB 三种通道的状态检测与引导。
  * 首次启动时由 MainActivity 自动弹出；实时检测授权状态，任一通道就绪即自动返回首页；
- * 未授权时按返回键即可回到首页。
+ * 未授权时按返回键或"进入首页"按钮即可回到首页。
  */
 class GuideActivity : AppCompatActivity() {
 
@@ -52,6 +54,7 @@ class GuideActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityGuideBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applyStatusBar()
 
         binding.toolbar.setNavigationOnClickListener {
             Prefs.setFirstGuideDone(this, true)
@@ -112,17 +115,23 @@ class GuideActivity : AppCompatActivity() {
         }
 
         binding.btnDetect.setOnClickListener { detect() }
+
+        binding.btnEnterHome.setOnClickListener {
+            Prefs.setFirstGuideDone(this, true)
+            finish()
+        }
+
         detect()
     }
 
     override fun onResume() {
         super.onResume()
+        applyStatusBar()
         try {
             Shizuku.addRequestPermissionResultListener(shizukuListener)
         } catch (t: Throwable) {
         }
         detect()
-        // 启动实时检测
         handler.removeCallbacks(detectRunnable)
         handler.postDelayed(detectRunnable, 2000L)
     }
@@ -136,14 +145,28 @@ class GuideActivity : AppCompatActivity() {
         }
     }
 
+    /** 状态栏颜色跟随主题。 */
+    private fun applyStatusBar() {
+        val isDark = when (Prefs.themeMode(this)) {
+            "light" -> false
+            "dark" -> true
+            else -> (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        }
+        window.statusBarColor = getColor(if (isDark) R.color.status_bar_dark else R.color.status_bar_light)
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = !isDark
+    }
+
     /** 任一通道就绪即视为授权完成。 */
     private fun isAnyChannelReady(): Boolean =
         Privilege.hasRoot() || Privilege.shizukuReady() || Privilege.hasAppGranted(this)
 
     private fun detect() {
-        setStatus(binding.rootStatus, Privilege.hasRoot(), R.string.guide_root_ok, R.string.guide_root_fail)
-
+        val rootOk = Privilege.hasRoot()
         val shizukuOk = Privilege.shizukuReady()
+        val adbOk = Privilege.hasAppGranted(this)
+
+        setStatus(binding.rootStatus, rootOk, R.string.guide_root_ok, R.string.guide_root_fail)
+
         if (shizukuOk) {
             setStatus(binding.shizukuStatus, true, R.string.guide_shizuku_ok, R.string.guide_shizuku_ok)
         } else {
@@ -154,7 +177,14 @@ class GuideActivity : AppCompatActivity() {
             setStatus(binding.shizukuStatus, false, hintRes, hintRes)
         }
 
-        setStatus(binding.adbStatus, Privilege.hasAppGranted(this), R.string.guide_adb_ok, R.string.guide_check)
+        setStatus(binding.adbStatus, adbOk, R.string.guide_adb_ok, R.string.guide_check)
+
+        // 更新整体状态芯片
+        val ready = rootOk || shizukuOk || adbOk
+        binding.chipOverall.text = getString(if (ready) R.string.guide_ready else R.string.guide_not_ready)
+        binding.chipOverall.setTextColor(
+            ContextCompat.getColor(this, if (ready) R.color.status_ok else R.color.status_err)
+        )
     }
 
     private fun setStatus(view: android.widget.TextView, ok: Boolean, okRes: Int, failRes: Int) {

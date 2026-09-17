@@ -128,8 +128,16 @@
     <string name="guide_checking">检测中…</string>
     <string name="guide_done">任一通道就绪即可开始使用；未就绪时应用仍可跳转系统设置页手动开关。</string>
     <string name="guide_auto_enter">授权已就绪，进入首页</string>
+    <string name="guide_enter_home">进入首页</string>
+    <string name="guide_ready">已就绪</string>
+    <string name="guide_not_ready">未就绪</string>
     <string name="exp_doze_mode">熄屏休眠省电</string>
     <string name="exp_doze_mode_desc">熄屏后暂停应用保活巡检、自监控降频至15分钟，亮屏自动恢复，显著降低待机耗电</string>
+    <string name="exp_theme">外观主题</string>
+    <string name="exp_theme_desc">选择白天、黑夜或跟随系统，状态栏颜色同步适配</string>
+    <string name="exp_theme_light">白天</string>
+    <string name="exp_theme_dark">黑夜</string>
+    <string name="exp_theme_system">跟随系统</string>
 
     <!-- Misc -->
     <string name="about_version">版本 %1$s</string>

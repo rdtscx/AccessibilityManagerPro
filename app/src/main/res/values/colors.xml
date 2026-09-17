@@ -29,4 +29,7 @@
     <!-- 桌面小部件文字（夜间在 values-night 覆盖） -->
     <color name="widget_text">#1A1B1C</color>
     <color name="widget_text_sub">#6B7280</color>
+    <!-- 状态栏颜色：跟随主题，避免突兀 -->
+    <color name="status_bar_light">#F8FAFC</color>
+    <color name="status_bar_dark">#121212</color>
 </resources>
