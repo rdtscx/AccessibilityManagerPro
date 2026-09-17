@@ -179,18 +179,13 @@ class SelfGuardService : Service() {
     /**
      * 前台服务启动兼容：
      *  - Android 14+（targetSdk 34）：必须显式传入与 manifest 匹配的服务类型，否则抛
-     *    MissingForegroundServiceTypeException 导致应用闪退（"看门狗开关打开即闪退"根因）；
-     *  - Android 9-13：三参重载可用，传 specialUse 常量无副作用；
-     *  - Android 8 及以下：仅两参重载。
+     *    MissingForegroundServiceTypeException 导致应用闪退；
+     *  - Android 13 及以下：两参重载即可（FOREGROUND_SERVICE_TYPE_NONE 已在 API 34 废弃）。
      */
     private fun startAsForeground(n: Notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIF_ID, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            )
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            startForeground(
-                NOTIF_ID, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE
             )
         } else {
             @Suppress("DEPRECATION")
