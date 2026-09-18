@@ -7,6 +7,15 @@
         android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- Shizuku API 权限：声明后 Shizuku 应用管理页面才会显示本应用，用户可在 Shizuku 内授权；
+         同时本应用调用 Shizuku.requestPermission() 时系统会校验此权限 -->
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+
+    <!-- Android 11+ 包可见性：显式声明可查询 Shizuku 应用，避免检测 Shizuku 是否安装时返回 false -->
+    <queries>
+        <package android:name="moe.shizuku.privileged.api" />
+    </queries>
+
     <!-- 库 minSdk 放行：Shizuku API 库要求 24，但代码层已在 API 21-23 硬性禁用 Shizuku 通道，
          仅当系统 >= 24 时才会调用 Shizuku，故 overrideLibrary 安全 -->
     <uses-sdk
