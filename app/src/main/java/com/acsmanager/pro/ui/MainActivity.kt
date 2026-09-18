@@ -1,9 +1,12 @@
 package com.acsmanager.pro.ui
 
+import android.app.ActivityManager
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -52,6 +55,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         selfProtectOnStartup()
+        applyHideFromRecents()
 
         // 首次启动：自动弹出授权引导页（用户可按返回键跳过）
         if (!Prefs.firstGuideDone(this)) {
@@ -85,6 +89,24 @@ class MainActivity : AppCompatActivity() {
                 if (comp.flattenToString() in AccessServiceRepo.enabledStrings(ctx)) return@withContext
                 ServiceStateController.setEnabled(ctx, comp, true, log = false)
             }
+        }
+    }
+
+    /**
+     * 应用"从最近应用列表隐藏"设置。
+     * 通过 ActivityManager.AppTask.setExcludeFromRecents 动态控制当前任务是否出现在最近任务列表中。
+     * 开启后用户无法从最近任务划走本应用，避免后台服务被杀。
+     */
+    fun applyHideFromRecents() {
+        try {
+            val hide = Prefs.hideFromRecents(this)
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            for (task in am.appTasks) {
+                task.setExcludeFromRecents(hide)
+            }
+            Log.i("MainActivity", "applyHideFromRecents: $hide")
+        } catch (t: Throwable) {
+            Log.w("MainActivity", "applyHideFromRecents failed", t)
         }
     }
 

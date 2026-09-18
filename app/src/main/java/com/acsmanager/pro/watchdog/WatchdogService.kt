@@ -133,13 +133,13 @@ class WatchdogService : Service() {
 
         // 逐条记录丢失事件：pkg = 被关闭服务的包名，detail = 完整组件名
         for (flat in missing) {
-            val pkg = flat.substringBefore('/').takeIf { it.isNotBlank() } ?: flat
+            val pkg = flat.substringBefore('/')
             EventLog.record(this, EventLog.TYPE_LOST, pkg, "accessibility off: $flat")
         }
         scope.launch {
             val result = ServiceStateController.restoreAll(this@WatchdogService, missing)
             for (m in missing) {
-                val pkg = m.substringBefore('/').takeIf { it.isNotBlank() } ?: m
+                val pkg = m.substringBefore('/')
                 EventLog.record(
                     this@WatchdogService,
                     if (result.ok) EventLog.TYPE_RESTORED else EventLog.TYPE_WARN,

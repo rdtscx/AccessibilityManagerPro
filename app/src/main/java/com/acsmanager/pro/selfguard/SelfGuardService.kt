@@ -301,7 +301,7 @@ class SelfGuardService : Service() {
 
         // 逐条记录丢失事件：pkg = 被关闭服务的包名，detail = 完整组件名
         for (flat in pending) {
-            val pkg = flat.substringBefore('/').takeIf { it.isNotBlank() } ?: flat
+            val pkg = flat.substringBefore('/')
             EventLog.record(this, EventLog.TYPE_LOST, pkg, "accessibility off: $flat")
         }
 
@@ -345,7 +345,7 @@ class SelfGuardService : Service() {
                     openAccessibilitySettings()
                 }
                 for (flat in missing) {
-                    val pkg = flat.substringBefore('/').takeIf { it.isNotBlank() } ?: flat
+                    val pkg = flat.substringBefore('/')
                     EventLog.record(
                         this@SelfGuardService, EventLog.TYPE_WARN, pkg,
                         "restore blocked: no privilege"
@@ -365,20 +365,20 @@ class SelfGuardService : Service() {
                 if (r.ok) {
                     successList.add(flat)
                 } else {
-                    failList.add(flat to (r.message ?: "unknown"))
+                    failList.add(flat to r.message)
                 }
             }
 
             // 逐条记录恢复结果事件
             for (flat in successList) {
-                val pkg = flat.substringBefore('/').takeIf { it.isNotBlank() } ?: flat
+                val pkg = flat.substringBefore('/')
                 EventLog.record(
                     this@SelfGuardService, EventLog.TYPE_RESTORED, pkg,
                     "restored via $channel"
                 )
             }
             for ((flat, msg) in failList) {
-                val pkg = flat.substringBefore('/').takeIf { it.isNotBlank() } ?: flat
+                val pkg = flat.substringBefore('/')
                 EventLog.record(
                     this@SelfGuardService, EventLog.TYPE_WARN, pkg,
                     "restore failed (attempt $attempt/3): $msg"

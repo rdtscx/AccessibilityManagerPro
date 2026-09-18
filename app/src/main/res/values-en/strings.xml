@@ -126,6 +126,8 @@
     <string name="guide_not_ready">Not ready</string>
     <string name="exp_doze_mode">Screen-off doze</string>
     <string name="exp_doze_mode_desc">Pause app keepalive and slow self-guard to 15min when screen off, auto-resume on screen on — saves standby battery</string>
+    <string name="exp_hide_recents">Hide from recents</string>
+    <string name="exp_hide_recents_desc">Hide this app from the recent tasks list to prevent accidental swipe-away from killing the accessibility service</string>
     <string name="exp_theme">Theme</string>
     <string name="exp_theme_desc">Choose light, dark or follow system — status bar color adapts automatically</string>
     <string name="exp_theme_light">Light</string>

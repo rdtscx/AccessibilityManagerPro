@@ -133,6 +133,8 @@
     <string name="guide_not_ready">未就绪</string>
     <string name="exp_doze_mode">熄屏休眠省电</string>
     <string name="exp_doze_mode_desc">熄屏后暂停应用保活巡检、自监控降频至15分钟，亮屏自动恢复，显著降低待机耗电</string>
+    <string name="exp_hide_recents">从最近应用列表隐藏</string>
+    <string name="exp_hide_recents_desc">开启后本应用不出现在最近任务列表中，防止用户误划走后台导致无障碍服务被杀</string>
     <string name="exp_theme">外观主题</string>
     <string name="exp_theme_desc">选择白天、黑夜或跟随系统，状态栏颜色同步适配</string>
     <string name="exp_theme_light">白天</string>

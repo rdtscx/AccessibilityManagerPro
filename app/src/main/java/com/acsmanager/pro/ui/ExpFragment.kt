@@ -83,6 +83,13 @@ class ExpFragment : Fragment() {
             }
         }
 
+        // 从最近应用列表隐藏：切换时立即生效
+        binding.switchHideRecents.setOnCheckedChangeListener { _, checked ->
+            if (programmaticSwitch) return@setOnCheckedChangeListener
+            Prefs.setHideFromRecents(requireContext(), checked)
+            (activity as? MainActivity)?.applyHideFromRecents()
+        }
+
         binding.sliderInterval.addOnChangeListener { _, value, fromUser ->
             if (!fromUser) return@addOnChangeListener
             Prefs.setKeepAliveIntervalMs(requireContext(), (value * 1000).toLong())
@@ -151,6 +158,7 @@ class ExpFragment : Fragment() {
         binding.switchDoze.isChecked = Prefs.dozeModeEnabled(requireContext())
         binding.switchNotifHistory.isChecked = Prefs.notifHistoryEnabled(requireContext())
         binding.switchNotifOverride.isChecked = Prefs.notifOverrideEnabled(requireContext())
+        binding.switchHideRecents.isChecked = Prefs.hideFromRecents(requireContext())
         programmaticSwitch = false
 
         // 初始化主题按钮选中状态（程序化设置，不触发 listener）

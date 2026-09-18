@@ -96,6 +96,8 @@ object Prefs {
         o.put("accessperm_user_only", accessPermUserOnly(ctx))
         // 实验
         o.put("event_throttle", eventThrottleMs(ctx))
+        // 从最近应用列表隐藏
+        o.put("hide_from_recents", hideFromRecents(ctx))
         return o.toString(2)
     }
 
@@ -133,6 +135,7 @@ object Prefs {
                 setLanguage(ctx, o.optString("language", "system"))
                 setAccessPermUserOnly(ctx, o.optBoolean("accessperm_user_only", false))
                 setEventThrottleMs(ctx, o.optLong("event_throttle", 300L))
+                setHideFromRecents(ctx, o.optBoolean("hide_from_recents", false))
             }
             true
         } catch (t: Throwable) {
@@ -451,6 +454,16 @@ object Prefs {
 
     fun setDozeActive(v: Boolean) {
         dozeActive = v
+    }
+
+    // ---------- 从最近应用列表隐藏 ----------
+
+    /** 是否从最近应用列表隐藏本应用（防止用户划走后台导致服务被杀）。默认关。 */
+    fun hideFromRecents(ctx: Context): Boolean =
+        get(ctx).getBoolean("hide_from_recents", false)
+
+    fun setHideFromRecents(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("hide_from_recents", v).apply()
     }
 
     // ---------- 用户主动关闭冷却期 ----------
