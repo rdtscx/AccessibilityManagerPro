@@ -48,7 +48,7 @@
 - 悬浮窗的 start/stop 不再每次都新建一个 WindowManager.LayoutParams，复用同一个对象。
 
 #### 其他：
-- 去掉了用不上的保活手段（JobScheduler、WorkManager、双进程服务那套），只留真正有用的。
+- 移除了不必要的保活手段（JobScheduler、WorkManager、双进程服务），仅保留必要功能。
 - 修了内存泄漏：Service/Receiver 里匿名 Handler 改静态内部类 + WeakReference，Callback 解注册，避免页面关了还在发消息。
 - 日志写到 `getExternalFilesDir`，不用再申请存储权限，卸载即清。
 - 加了个"无障碍服务状态"卡片，开关 + 跳转，不用再自己翻系统设置。
