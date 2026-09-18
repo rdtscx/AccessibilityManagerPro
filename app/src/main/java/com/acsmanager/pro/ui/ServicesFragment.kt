@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.acsmanager.pro.R
 import com.acsmanager.pro.core.AccessServiceRepo
 import com.acsmanager.pro.core.AccessServiceItem
+import com.acsmanager.pro.core.AccessibilitySettingsObserver
 import com.acsmanager.pro.core.Privilege
 import com.acsmanager.pro.core.ServiceStateController
 import com.acsmanager.pro.databinding.FragmentServicesBinding
@@ -37,6 +38,9 @@ class ServicesFragment : Fragment() {
         onToggle = { item, enabled -> toggle(item, enabled) }
     )
 
+    /** 监听 Settings.Secure 变化：后台拉起服务后自动刷新列表。 */
+    private var settingsObserver: AccessibilitySettingsObserver? = null
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -47,6 +51,10 @@ class ServicesFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         binding.serviceList.layoutManager = LinearLayoutManager(requireContext())
         binding.serviceList.adapter = adapter
+
+        settingsObserver = AccessibilitySettingsObserver(requireContext()) {
+            load()
+        }
 
         binding.btnGuide.setOnClickListener {
             startActivity(Intent(requireContext(), GuideActivity::class.java))
@@ -71,6 +79,16 @@ class ServicesFragment : Fragment() {
 
         requestNotifPermissionIfNeeded()
         load()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        settingsObserver?.register()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        settingsObserver?.unregister()
     }
 
     override fun onResume() {

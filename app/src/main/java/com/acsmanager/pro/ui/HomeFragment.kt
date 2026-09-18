@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.acsmanager.pro.R
 import com.acsmanager.pro.core.AccessServiceRepo
+import com.acsmanager.pro.core.AccessibilitySettingsObserver
 import com.acsmanager.pro.core.Privilege
 import com.acsmanager.pro.databinding.FragmentHomeBinding
 import com.acsmanager.pro.selfguard.SelfAccessService
@@ -34,6 +35,9 @@ class HomeFragment : Fragment() {
     private val notifPermLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    /** 监听 Settings.Secure 变化：后台拉起服务后自动刷新首页状态。 */
+    private var settingsObserver: AccessibilitySettingsObserver? = null
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -43,6 +47,10 @@ class HomeFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        settingsObserver = AccessibilitySettingsObserver(requireContext()) {
+            refresh()
+        }
 
         binding.btnEnableSelfAccess.setOnClickListener {
             startActivity(
@@ -116,6 +124,16 @@ class HomeFragment : Fragment() {
         binding.btnSettingsEntry.setOnClickListener {
             (activity as? MainActivity)?.openFragment(SettingsFragment())
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        settingsObserver?.register()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        settingsObserver?.unregister()
     }
 
     override fun onResume() {

@@ -60,12 +60,20 @@ class SelfGuardService : Service() {
             java.util.Collections.synchronizedSet(mutableSetOf<String>())
         private const val SELF_OP_COOLDOWN_MS = 3000L
         private val selfOpHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        /** 每个服务对应的冷却期结束 Runnable，用于精确移除旧回调（修复 removeCallbacksAndMessages 无法匹配无 token Runnable 的问题）。 */
+        private val selfOpRunnables = java.util.Collections.synchronizedMap(mutableMapOf<String, Runnable>())
 
         /** 标记本应用正在操作某个服务（开启/关闭），操作后冷却期内不触发丢失检测。 */
         fun markSelfOperating(flatten: String) {
             selfOperating.add(flatten)
-            selfOpHandler.removeCallbacksAndMessages(flatten)
-            selfOpHandler.postDelayed({ selfOperating.remove(flatten) }, SELF_OP_COOLDOWN_MS)
+            // 先移除该服务上一次的冷却期回调，避免旧回调提前清除状态
+            selfOpRunnables.remove(flatten)?.let { selfOpHandler.removeCallbacks(it) }
+            val r = Runnable {
+                selfOperating.remove(flatten)
+                selfOpRunnables.remove(flatten)
+            }
+            selfOpRunnables[flatten] = r
+            selfOpHandler.postDelayed(r, SELF_OP_COOLDOWN_MS)
         }
 
         /** 查询服务是否在本应用自身操作的冷却期内。 */
@@ -233,6 +241,37 @@ class SelfGuardService : Service() {
     private fun onSecureChanged() {
         val enabled = AccessServiceRepo.enabledStrings(this)
         val toRestore = mutableListOf<String>()
+
+        // 检查 accessibility_enabled 全局开关：若有受保护服务但全局开关被关闭，先修复全局开关
+        val protectedAll = mutableSetOf<String>().apply {
+            add(selfComponent(this@SelfGuardService).flattenToString())
+            addAll(Prefs.lockedAccessibilityServices(this@SelfGuardService))
+            addAll(Prefs.protectedServices(this@SelfGuardService))
+            addAll(Prefs.bootAccessibilityServices(this@SelfGuardService))
+        }
+        val hasProtectedEnabled = protectedAll.any { it in enabled }
+        if (hasProtectedEnabled && !AccessServiceRepo.isAccessibilityEnabled(this)) {
+            Log.w(TAG, "accessibility_enabled=0 but protected services present, fixing...")
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    try {
+                        when (Privilege.bestChannel(this@SelfGuardService)) {
+                            Privilege.Channel.APP_GRANTED ->
+                                android.provider.Settings.Secure.putString(
+                                    contentResolver, "accessibility_enabled", "1"
+                                )
+                            Privilege.Channel.ROOT ->
+                                Privilege.runShell(arrayOf("su", "-c", "settings put secure accessibility_enabled 1"))
+                            Privilege.Channel.SHIZUKU ->
+                                Privilege.shizukuExec(this@SelfGuardService, "settings", "put", "secure", "accessibility_enabled", "1")
+                            else -> Unit
+                        }
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "fix accessibility_enabled failed", t)
+                    }
+                }
+            }
+        }
 
         val self = selfComponent(this).flattenToString()
         if (self !in enabled) toRestore.add(self)

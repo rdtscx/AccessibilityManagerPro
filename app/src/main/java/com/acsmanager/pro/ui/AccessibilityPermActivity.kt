@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.acsmanager.pro.R
 import com.acsmanager.pro.core.AccessServiceItem
 import com.acsmanager.pro.core.AccessServiceRepo
+import com.acsmanager.pro.core.AccessibilitySettingsObserver
 import com.acsmanager.pro.core.Privilege
 import com.acsmanager.pro.core.ServiceStateController
 import com.acsmanager.pro.databinding.ActivityAccessPermBinding
@@ -50,6 +51,9 @@ class AccessibilityPermActivity : AppCompatActivity() {
     /** 乐观状态：写成功后立即覆盖 UI 显示，不等系统缓存异步生效。 */
     private val optimistic = mutableMapOf<String, Boolean>()
 
+    /** 监听 Settings.Secure 变化：后台自监控拉起服务后自动刷新列表（修复"拉起生效但页面不刷新"bug）。 */
+    private lateinit var settingsObserver: AccessibilitySettingsObserver
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityAccessPermBinding.inflate(layoutInflater)
@@ -57,6 +61,12 @@ class AccessibilityPermActivity : AppCompatActivity() {
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         binding.toolbar.setNavigationOnClickListener { finish() }
+
+        settingsObserver = AccessibilitySettingsObserver(this) {
+            // 系统设置变化时清除乐观状态，读取真实状态刷新
+            optimistic.clear()
+            refresh()
+        }
 
         adapter = AccessPermAdapter(
             onToggle = { item, enabled -> toggleService(item, enabled) },
@@ -67,6 +77,16 @@ class AccessibilityPermActivity : AppCompatActivity() {
         binding.recycler.adapter = adapter
         binding.tvCount.text = ""
         refresh()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        settingsObserver.register()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        settingsObserver.unregister()
     }
 
     override fun onResume() {
