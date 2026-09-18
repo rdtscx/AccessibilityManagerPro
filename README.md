@@ -1,4 +1,4 @@
-# 无障碍管理器 Pro（Accessibility Manager Pro）v2.0.1
+# 无障碍管理器 Pro（Accessibility Manager Pro）v2.0.2
 
 一款基于 Android 无障碍服务体系的**多功能管理器**。原理与原版「无障碍管理器（com.accessibilitymanager）」一致：
 读取系统 `AccessibilityManager` 真实服务列表，通过 `WRITE_SECURE_SETTINGS`（ADB 授权 / Root / Shizuku 三种通道）
@@ -7,6 +7,14 @@
 
 > ⚠️ 无障碍服务可读取屏幕内容（含账号、验证码等敏感信息）。本应用自身的无障碍服务**不读取屏幕内容**
 > （仅监听窗口切换事件），但请在系统设置中确认授权对象后再启用。本应用仅供合法用途。
+
+## v2.0.2 更新内容
+
+### Bug 修复（重要）
+
+- **修复 Shizuku 应用管理中找不到本应用的问题**：根因是 AndroidManifest.xml 中缺少 Shizuku API 权限声明 `moe.shizuku.manager.permission.API_V23`。Shizuku 通过查询哪些应用声明了此权限来展示应用管理列表，缺少声明则完全不显示。添加权限声明后，Shizuku 应用管理页面会显示"无障碍管理器 Pro"，用户可在 Shizuku 内授权。
+- **修复本应用内无法拉起 Shizuku 授权的问题**：同样因缺少权限声明，`Shizuku.requestPermission()` 调用会失败。权限声明修复后，首页点击授权按钮可正常拉起 Shizuku 授权弹窗。
+- **添加 queries 声明**：Android 11+ 包可见性，显式声明可查询 Shizuku 应用（`moe.shizuku.privileged.api`），避免检测 Shizuku 是否安装时 `getPackageInfo` 返回 false。
 
 ## v2.0.1 更新内容
 
