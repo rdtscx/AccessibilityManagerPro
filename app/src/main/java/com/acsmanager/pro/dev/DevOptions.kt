@@ -118,21 +118,14 @@ object DevOptions {
 
     private fun shellWrite(ctx: Context, o: Option, value: String): WriteResult {
         val table = if (o.table == Table.GLOBAL) "global" else "system"
-        val cmd = "settings put $table ${o.key} $value"
-        return when (val ch = Privilege.bestChannel(ctx)) {
-            Privilege.Channel.ROOT -> {
-                val out = Privilege.runShell(arrayOf("su", "-c", cmd))
-                val ok = out != null && verify(ctx, o, value)
-                WriteResult(ok, ch, if (ok) "root" else (out ?: "root failed"))
-            }
-            Privilege.Channel.SHIZUKU -> {
-                val parts = cmd.split(" ")
-                val out = Privilege.shizukuExec(ctx, *parts.toTypedArray())
-                val ok = out != null && verify(ctx, o, value)
-                WriteResult(ok, ch, if (ok) "shizuku" else (out ?: "shizuku failed"))
-            }
-            else -> WriteResult(false, ch, "no_privilege")
+        // Root / Shizuku 统一走 execShell（参数经 shell 转义；value 为数字，安全）
+        val ch = Privilege.bestChannel(ctx)
+        if (ch != Privilege.Channel.ROOT && ch != Privilege.Channel.SHIZUKU) {
+            return WriteResult(false, ch, "no_privilege")
         }
+        val out = Privilege.execShell(ctx, "settings", "put", table, o.key, value)
+        val ok = out != null && verify(ctx, o, value)
+        return WriteResult(ok, ch, if (ok) ch.name.lowercase() else (out ?: "$ch failed"))
     }
 
     private fun verify(ctx: Context, o: Option, value: String): Boolean = try {

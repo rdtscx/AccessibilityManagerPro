@@ -74,7 +74,15 @@ class WatchdogService : Service() {
 
     private val checkRunnable = object : Runnable {
         override fun run() {
-            runCheck()
+            val protected = (Prefs.protectedServices(this@WatchdogService) +
+                    Prefs.bootAccessibilityServices(this@WatchdogService)).toList()
+            if (protected.isEmpty()) {
+                // 保护名单为空：停止周期调度，避免无意义地定时唤醒 CPU（耗电）。
+                // 用户在设置中添加名单后会调用 start() → onStartCommand 重新调度。
+                running = false
+                return
+            }
+            runCheck(protected)
             handler.postDelayed(this, intervalMs())
         }
     }
@@ -96,10 +104,10 @@ class WatchdogService : Service() {
         }
         createChannel()
         startAsForeground(buildNotification())
-        if (!running) {
-            running = true
-            handler.post(checkRunnable)
-        }
+        // 每次 start 都重新调度（先移除旧回调），确保从"空名单停摆"状态恢复
+        handler.removeCallbacks(checkRunnable)
+        running = true
+        handler.post(checkRunnable)
         return START_STICKY
     }
 
@@ -123,9 +131,7 @@ class WatchdogService : Service() {
     private fun intervalMs(): Long =
         Prefs.watchdogIntervalMs(this).coerceIn(5_000L, 10 * 60_000L)
 
-    private fun runCheck() {
-        // 看门狗保护集合 = 用户自选保护 + 权限页"开机启动保活"勾选的服务
-        val protected = (Prefs.protectedServices(this) + Prefs.bootAccessibilityServices(this)).toList()
+    private fun runCheck(protected: List<String>) {
         if (protected.isEmpty()) return
         val current = AccessServiceRepo.enabledStrings(this).toSet()
         val missing = protected.filter { it !in current }

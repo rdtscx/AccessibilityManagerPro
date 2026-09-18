@@ -135,18 +135,12 @@ object PermGroups {
     /** 授予或撤销权限（系统级）。仅 Root / Shizuku 通道可执行；失败返回 false。 */
     fun setGranted(ctx: Context, pkg: String, permission: String, grant: Boolean): Boolean {
         val action = if (grant) "grant" else "revoke"
-        return when (Privilege.bestChannel(ctx)) {
-            Privilege.Channel.ROOT -> {
-                // pm grant 成功无输出；失败输出错误文本
-                val out = Privilege.runShell(arrayOf("su", "-c", "pm $action $pkg $permission"))
-                out != null && out.isBlank()
-            }
-            Privilege.Channel.SHIZUKU -> {
-                val out = Privilege.shizukuExec(ctx, "pm", action, pkg, permission)
-                out != null && out.isBlank()
-            }
-            else -> false
-        }
+        // 统一走 execShell（Root/Shizuku 自动选择，参数经 shell 转义）
+        val out = Privilege.execShell(ctx, "pm", action, pkg, permission) ?: return false
+        // pm grant/revoke 成功时无输出；失败输出错误/异常文本
+        val t = out.trim()
+        return t.isEmpty() ||
+            (!t.contains("error", ignoreCase = true) && !t.startsWith("Exception"))
     }
 
     /** 生成 ADB 手动执行命令（用于无 Root/Shizuku 时的降级指引）。 */

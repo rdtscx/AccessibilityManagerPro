@@ -135,7 +135,7 @@
     <string name="exp_theme_system">System</string>
 
     <string name="about_version">Version %1$s</string>
-    <string name="about_body">An open-source accessibility service manager: view, toggle and keep alive accessibility services, with Root / Shizuku / ADB channels. For legitimate use only; only enable trusted services.</string>
+    <string name="about_body">An open-source accessibility service manager: view, toggle and keep alive accessibility services, with Root / Shizuku / ADB channels. For legitimate use only; only enable trusted services.\n\nThis app requests no network access, includes no ads, and collects no data.\n\nThis is the final release. The software is now feature-complete; no further updates will be made and no feedback will be accepted. Thank you for using it.</string>
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
     <string name="back">Back</string>

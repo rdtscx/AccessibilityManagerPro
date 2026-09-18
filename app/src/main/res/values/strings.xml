@@ -143,7 +143,7 @@
 
     <!-- Misc -->
     <string name="about_version">版本 %1$s</string>
-    <string name="about_body">一款开源的无障碍服务管理器：集中查看、启停、保活设备上的无障碍服务，支持 Root / Shizuku / ADB 三种授权通道。仅供合法用途，请仅启用可信服务。</string>
+    <string name="about_body">一款开源的无障碍服务管理器：集中查看、启停、保活设备上的无障碍服务，支持 Root / Shizuku / ADB 三种授权通道。仅供合法用途，请仅启用可信服务。\n\n本软件不请求任何网络连接，不对接任何广告，不收集任何数据。\n\n本版本为最终版，功能已完善，后续不再进行任何更新，亦不再接受任何反馈。感谢使用。</string>
     <string name="ok">确定</string>
     <string name="cancel">取消</string>
     <string name="back">返回</string>

@@ -1,4 +1,13 @@
-# 无障碍管理器 Pro（Accessibility Manager Pro）v2.0.4
+# 无障碍管理器 Pro（Accessibility Manager Pro）v3.0.0 · 最终版
+
+> ## 🏁 最终版声明
+>
+> **本版本（v3.0.0）为最终版，软件功能已完善，后续不再进行任何更新，亦不再接受任何反馈（Issue / PR）。**
+>
+> - **本软件不请求任何网络连接**：Manifest 中未声明 `INTERNET` / `ACCESS_NETWORK_STATE` 权限，物理上无法联网，可用 `aapt dump permissions` 自行核验。
+> - **本软件不对接任何广告、不内置任何统计 / 崩溃上报 / 推送 SDK**。
+> - **本软件不收集任何数据**：全部配置与日志仅存本机。
+> - 代码完全开源（MIT），可自行审计、编译。
 
 一款基于 Android 无障碍服务体系的**多功能管理器**。原理与原版「无障碍管理器（com.accessibilitymanager）」一致：
 读取系统 `AccessibilityManager` 真实服务列表，通过 `WRITE_SECURE_SETTINGS`（ADB 授权 / Root / Shizuku 三种通道）
@@ -7,6 +16,31 @@
 
 > ⚠️ 无障碍服务可读取屏幕内容（含账号、验证码等敏感信息）。本应用自身的无障碍服务**不读取屏幕内容**
 > （仅监听窗口切换事件），但请在系统设置中确认授权对象后再启用。本应用仅供合法用途。
+
+## v3.0.0 更新内容（最终版）
+
+### 三条授权通道全面审查与完善
+
+- **Root 通道：探测结果缓存（重要省电 / 稳定性修复）**。此前每次 `bestChannel()` 都执行 `su -c id`，后台自监控 / 保活巡检会反复 fork `su` 进程，造成额外耗电，并可能在部分 Root 管理器上反复弹出授权框。现改为：探测成功后进程内缓存、失败缓存 15 秒；当 `su` 明确返回权限拒绝 / 不存在时自动失效缓存重新探测。
+- **Root / Shizuku 通道：shell 命令统一转义**。新增 POSIX 单引号转义（`joinForShell` / `shellQuote`），所有经 `execShell` 下发的参数（包名、组件串、键值）统一转义，杜绝含空格或特殊字符参数被 shell 错误拆分；`ServiceStateController`、`PermGroups`、`NotifGateService`、`DevOptions` 中原先手写的 `su -c "..."` 字符串拼接全部收敛到 `execShell`。
+- **全通道 shell 超时保护**。`runShell()` 此前的 `timeoutSec` 形参从未生效（使用无超时 `waitFor()`），异常命令可能永久挂起调用线程。现 API 26+ 使用 `waitFor(timeout)`、低版本用守护线程 join 兜底，超时后强制销毁进程并返回 null。
+- **Shizuku 通道：Binder 死亡联动清理**。Shizuku 服务被杀 / 重启时，除更新连接标志外，同步清理 `Privilege` 中缓存的 UserService 绑定（`shizukuBinder` / `shizukuBound`），避免复用失效远程 binder 导致命令静默失败。
+- **ADB 通道（WRITE_SECURE_SETTINGS）能力边界明确**：直写 `Settings.Secure/Global`；`Settings.System` 类项（如显示点按操作）与 `pm grant` / `pidof` 等需要 shell 身份的操作，在仅 ADB 授权时正确降级为提示 / 复制 ADB 命令，不再静默失败。
+- 三条通道的成功 / 失败判定统一为「空输出 = 成功，含 error/Exception = 失败」。
+
+### 运行占用与电量优化
+
+- **看门狗空名单不再空转**：保护名单为空时停止周期调度（此前仍按间隔定时唤醒 CPU），用户添加名单后由 `start()` 自动恢复调度。
+- **应用保活：使用情况访问权限检测结果缓存 60 秒**，避免每个保活目标每轮巡检都执行一次 `UsageStatsManager.queryEvents`。
+- **应用保活：`pidof` shell 判定结果独立缓存 20 秒**，多目标巡检时显著减少 Root/Shizuku 进程 fork 次数。
+- 配合 v2.0.4 已有的 ContentObserver 零轮询自监控、熄屏休眠降频、无障碍事件采样降频、自监控 / 看门狗前台服务互斥合并，常驻开销进一步降低。
+
+### Bug 修复
+
+- 修复自监控修复 `accessibility_enabled` 全局开关时，Shizuku 分支无论成败都返回成功的问题，现按命令输出如实判定。
+- 修复 Root 探测在命令长时间无响应时可能拖垮后台恢复流程的隐患（超时保护）。
+- 修复 Shizuku Binder 死亡后 UserService 绑定状态残留、后续命令复用失效 binder 的问题。
+- 统一并修正多处 shell 成功判定，降低权限授予 / 通知调控结果误报。
 
 ## v2.0.4 更新内容
 
@@ -315,8 +349,11 @@ export ANDROID_HOME=/path/to/android-sdk
 release 构建默认启用 R8 混淆与资源压缩，仅打包中/英语言资源（`resConfigs("zh","en")`），签名密钥见项目根 `release.keystore`
 （alias=acsmanager；新证书，与 v1.0.0 debug 证书不同，升级安装需先卸载旧版）。
 
-## 隐私
+## 隐私（最终版承诺）
 
+- **不请求任何网络连接**：Manifest 未声明 `INTERNET` / `ACCESS_NETWORK_STATE` 权限，应用物理上无法联网；可通过 `aapt dump permissions app-release.apk` 核验，权限列表中不存在任何网络权限。
+- **不对接任何广告**：无广告 SDK、无推广位、无变现组件。
+- **不内置任何统计 / 崩溃上报 / 推送 SDK**，不收集、不上传任何数据。
 - 本应用无障碍服务**不读取屏幕内容**（`canRetrieveWindowContent=false`），仅接收窗口切换事件用于保活判定。
 - 全部配置（保活名单、通知等级、统计）仅存本机；通知拦截历史仅存本机（最多 200 条，可在实验页关闭）。
-- 不上传任何数据，无网络权限。
+- 代码完全开源（MIT），以上承诺均可通过审计源码与构建产物验证。

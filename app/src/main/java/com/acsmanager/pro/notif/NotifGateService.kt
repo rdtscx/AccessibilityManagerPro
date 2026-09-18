@@ -119,10 +119,9 @@ class NotifGateService : NotificationListenerService() {
                 // 精细调控降级为放行（系统层面无法静默降级对方通知）。
                 return
             }
-            Privilege.Channel.ROOT ->
-                Privilege.runShell(arrayOf("su", "-c", cmd.joinToString(" ")))
-            Privilege.Channel.SHIZUKU ->
-                Privilege.shizukuExec(this, *cmd)
+            // Root / Shizuku 统一走 execShell（参数经 shell 转义）
+            Privilege.Channel.ROOT, Privilege.Channel.SHIZUKU ->
+                Privilege.execShell(this, *cmd)
             else -> null
         }
         // shell 命令成功时输出为空；含 error 或 Exception 才是失败

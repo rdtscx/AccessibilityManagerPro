@@ -2,7 +2,6 @@ package com.acsmanager.pro.core
 
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
@@ -18,10 +17,16 @@ import java.util.concurrent.TimeUnit
 
 /**
  * 授权通道探测与命令执行。
- * 三种通道（与原版原理一致）：
- *  - APP_GRANTED：已通过 adb shell pm grant 授予 WRITE_SECURE_SETTINGS，可直接写 Settings.Secure
+ * 三种通道：
+ *  - APP_GRANTED：已通过 adb shell pm grant 授予 WRITE_SECURE_SETTINGS，可直接写 Settings.Secure/Global
  *  - ROOT：设备已 Root，通过 su -c settings ... 执行
  *  - SHIZUKU：已连接 Shizuku 且已授权，通过 Shizuku 的 binder 进程执行 settings ...
+ *
+ * 最终版耗电/稳定性优化：
+ *  - Root 探测结果缓存（成功后进程内永久缓存，失败缓存 15s），避免后台服务反复 fork su 进程；
+ *  - 所有 shell 命令带超时保护，防止命令挂起永久占用线程；
+ *  - shell 参数统一转义，杜绝含空格/特殊字符参数导致的命令解析错误；
+ *  - Shizuku Binder 死亡时清理 UserService 绑定状态，避免复用失效 binder。
  */
 object Privilege {
 
@@ -45,15 +50,41 @@ object Privilege {
         false
     }
 
-    /** 探测 Root。 */
+    // ---------- Root 探测（带缓存，避免反复 fork su 耗电/弹授权框） ----------
+
+    @Volatile
+    private var rootConfirmed = false
+
+    @Volatile
+    private var rootLastFailMs = 0L
+
+    /** Root 失败结果缓存时长：15 秒内不重复探测（应对 su 授权框被拒/短暂不可用）。 */
+    private const val ROOT_FAIL_CACHE_MS = 15_000L
+
+    /** 探测 Root（结果缓存）。 */
     fun hasRoot(): Boolean {
-        val out = runShell(arrayOf("su", "-c", "id"), 5)
-        return out != null && out.contains("uid=0")
+        if (rootConfirmed) return true
+        if (System.currentTimeMillis() - rootLastFailMs < ROOT_FAIL_CACHE_MS) return false
+        val out = runShell(arrayOf("su", "-c", "id"), 8)
+        val ok = out != null && out.contains("uid=0")
+        if (ok) {
+            rootConfirmed = true
+        } else {
+            rootLastFailMs = System.currentTimeMillis()
+        }
+        return ok
+    }
+
+    /**
+     * su 命令明确返回权限拒绝/不存在时失效 Root 缓存，下一轮重新探测。
+     */
+    private fun invalidateRoot() {
+        rootConfirmed = false
+        rootLastFailMs = System.currentTimeMillis()
     }
 
     fun shizukuReady(): Boolean = if (Build.VERSION.SDK_INT < MIN_SHIZUKU_API) false else try {
-        Shizuku.pingBinder() &&
-            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        shizukuConnected() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
     } catch (t: Throwable) {
         false
     }
@@ -63,8 +94,7 @@ object Privilege {
         return try {
             // 优先使用 Application 中维护的 Binder 存活状态（由 OnBinderReceived/Dead 监听器实时更新），
             // 避免每次检测都跨进程 ping 导致 Shizuku 服务端频繁校验客户端兼容性。
-            if (com.acsmanager.pro.App.shizukuBinderAlive) return true
-            Shizuku.pingBinder()
+            if (com.acsmanager.pro.App.shizukuBinderAlive) true else Shizuku.pingBinder()
         } catch (t: Throwable) {
             false
         }
@@ -86,7 +116,7 @@ object Privilege {
         }
     }
 
-    /** 当前可用的最佳通道。 */
+    /** 当前可用的最佳通道。Root 结果已缓存，重复调用开销极小。 */
     fun bestChannel(ctx: Context): Channel = when {
         hasAppGranted(ctx) -> Channel.APP_GRANTED
         hasRoot() -> Channel.ROOT
@@ -94,28 +124,77 @@ object Privilege {
         else -> Channel.NONE
     }
 
+    /**
+     * 执行本地 shell 命令（带超时保护）。
+     * @param timeoutSec 超时秒数；超时后强制销毁进程，返回 null。
+     */
     fun runShell(cmd: Array<String>, timeoutSec: Long = 10): String? {
         return try {
             val p = ProcessBuilder(*cmd).redirectErrorStream(true).start()
             val out = BufferedReader(InputStreamReader(p.inputStream)).readText()
-            // 输出流读尽即进程结束；waitFor() 无参版兼容全部 API（带超时版需 API 26+）
-            p.waitFor()
-            out.trim()
+            // API 26+ 使用带超时的 waitFor；低版本用守护线程 join 兜底
+            val finished = if (Build.VERSION.SDK_INT >= 26) {
+                p.waitFor(timeoutSec, TimeUnit.SECONDS)
+            } else {
+                val proc = p
+                val worker = Thread {
+                    try { proc.waitFor() } catch (t: Throwable) {}
+                }.apply { isDaemon = true; start() }
+                worker.join(timeoutSec * 1000L)
+                !worker.isAlive
+            }
+            if (!finished) {
+                destroyProcessCompat(p)
+                Log.w(TAG, "shell timeout after ${timeoutSec}s: ${cmd.joinToString(" ")}")
+                null
+            } else {
+                out.trim().also { detectRootDenied(cmd, it) }
+            }
         } catch (t: Throwable) {
             Log.w(TAG, "shell failed: ${cmd.joinToString(" ")}", t)
             null
         }
     }
 
+    /** su 返回权限拒绝/不存在时失效 Root 缓存。 */
+    private fun detectRootDenied(cmd: Array<String>, out: String) {
+        val isSu = cmd.any { it == "su" } || cmd.getOrNull(0)?.startsWith("su") == true
+        if (isSu && (out.contains("permission denied", ignoreCase = true) ||
+                out.contains("not found", ignoreCase = true))
+        ) {
+            invalidateRoot()
+        }
+    }
+
+    private fun destroyProcessCompat(p: java.lang.Process) {
+        try {
+            if (Build.VERSION.SDK_INT >= 26) p.destroyForcibly() else p.destroy()
+        } catch (t: Throwable) {}
+    }
+
     /**
      * 经授权通道执行系统命令（Root/Shizuku 具备 shell 身份）。
-     * APP_GRANTED 通道只能写 Settings.Secure，无法执行 shell 命令，返回 null。
-     * 用于 pm grant/revoke、dumpsys 等系统级操作。
+     * APP_GRANTED 通道只能写 Settings，无法执行 shell 命令，返回 null。
+     * 用于 pm grant/revoke、dumpsys、pidof 等系统级操作。
      */
     fun execShell(ctx: Context, vararg cmd: String): String? = when (bestChannel(ctx)) {
-        Channel.ROOT -> runShell(arrayOf("su", "-c", cmd.joinToString(" ")))
+        Channel.ROOT -> runShell(arrayOf("su", "-c", joinForShell(cmd)))
         Channel.SHIZUKU -> shizukuExec(ctx, *cmd)
         else -> null
+    }
+
+    /**
+     * 将命令参数拼接为单条 shell 命令字符串，逐个参数做 POSIX 单引号转义，
+     * 避免含空格/特殊字符的参数被 shell 错误拆分。
+     */
+    private fun joinForShell(cmd: Array<out String>): String =
+        cmd.joinToString(" ") { shellQuote(it) }
+
+    /** POSIX shell 单引号转义：' -> '\''；安全字符集免引号。 */
+    private fun shellQuote(s: String): String {
+        if (s.isEmpty()) return "''"
+        if (s.all { it.isLetterOrDigit() || it in "_-./:@%+=" }) return s
+        return "'" + s.replace("'", "'\\''") + "'"
     }
 
     // ---------- Shizuku UserService 执行通道 ----------
@@ -125,6 +204,16 @@ object Privilege {
 
     /** 主线程 Handler（复用，避免每次 ensureShizuku 都创建新对象）。 */
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /**
+     * Shizuku Binder 死亡时由 [com.acsmanager.pro.App] 回调：
+     * 清理 UserService 绑定状态，避免后续复用已失效的远程 binder。
+     */
+    fun onShizukuBinderDead() {
+        Log.w(TAG, "Shizuku binder dead, clearing UserService state")
+        shizukuBinder = null
+        shizukuBound = false
+    }
 
     /** Shizuku 状态细分（首页授权卡片展示用）。 */
     enum class ShizukuStatus {
@@ -144,11 +233,6 @@ object Privilege {
     /**
      * 确保已绑定 CommandService（运行在 Shizuku 进程，具备 shell 权限）。
      * Shizuku.bindUserService 需在主线程调用，绑定异步回调；失败自动重试一次。
-     *
-     * 修复要点：
-     *  - 解绑使用 Shizuku.unbindUserService（而非 ctx.unbindService，后者用于普通 Service）；
-     *  - 注册 Binder 死亡监听，Shizuku 服务被杀时及时清理状态；
-     *  - UserServiceArgs 设置 version 和 processNameSuffix，符合 Shizuku 官方推荐。
      */
     fun ensureShizuku(ctx: Context): Boolean {
         if (Build.VERSION.SDK_INT < MIN_SHIZUKU_API) return false
@@ -159,7 +243,7 @@ object Privilege {
             val latch = java.util.concurrent.CountDownLatch(1)
             var connected = false
             val cn = ComponentName(ctx, CommandService::class.java)
-            val args = rikka.shizuku.Shizuku.UserServiceArgs(cn)
+            val args = Shizuku.UserServiceArgs(cn)
                 .daemon(false)
                 .version(1)
                 .processNameSuffix("command")
@@ -180,7 +264,7 @@ object Privilege {
             try {
                 mainHandler.post {
                     try {
-                        rikka.shizuku.Shizuku.bindUserService(args, conn)
+                        Shizuku.bindUserService(args, conn)
                     } catch (t: Throwable) {
                         Log.w(TAG, "bindUserService failed", t)
                         latch.countDown()
@@ -194,11 +278,10 @@ object Privilege {
             } finally {
                 if (!connected) {
                     try {
-                        // 修复：Shizuku.unbindUserService 需要 (UserServiceArgs, ServiceConnection, boolean) 三个参数
-                        // remove=true 表示同时杀死远程 UserService 进程（Shizuku 不会自动杀死 UserService）
+                        // remove=true 同时杀死远程 UserService 进程（Shizuku 不会自动杀死 UserService）
                         mainHandler.post {
                             try {
-                                rikka.shizuku.Shizuku.unbindUserService(args, conn, true)
+                                Shizuku.unbindUserService(args, conn, true)
                             } catch (t: Throwable) {
                                 Log.w(TAG, "unbindUserService failed", t)
                             }
@@ -220,7 +303,7 @@ object Privilege {
         val reply = Parcel.obtain()
         return try {
             data.writeInterfaceToken(CommandService.DESCRIPTOR)
-            data.writeStringArray(cmd)
+            data.writeStringArray(cmd.toList().toTypedArray())
             binder.transact(CommandService.CODE_EXEC, data, reply, 0)
             reply.readString()
         } catch (t: Throwable) {
@@ -229,7 +312,6 @@ object Privilege {
             shizukuBound = false
             null
         } finally {
-            // 修复：使用 try-finally 确保 Parcel 资源被回收，避免 transact 异常时泄漏
             data.recycle()
             reply.recycle()
         }

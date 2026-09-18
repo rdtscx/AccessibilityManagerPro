@@ -58,6 +58,15 @@ object KeepAliveEngine {
     private val aliveCache = ConcurrentHashMap<String, Pair<Long, Boolean>>()
     private const val ALIVE_CACHE_MAX = 128
 
+    /** 使用情况访问权限检测结果缓存（权限状态运行中几乎不变，缓存 60s，避免每轮巡检重复查询）。 */
+    @Volatile
+    private var usageAccessCached: Pair<Long, Boolean>? = null
+    private const val USAGE_ACCESS_CACHE_MS = 60_000L
+
+    /** pidof shell 判定结果独立缓存（20s），避免多目标巡检时反复 fork su/Shizuku 进程耗电。 */
+    private val pidofCache = ConcurrentHashMap<String, Pair<Long, Boolean>>()
+    private const val PIDOF_CACHE_MS = 20_000L
+
     @Volatile
     private var service: SelfAccessService? = null
 
@@ -186,7 +195,7 @@ object KeepAliveEngine {
         }
 
         // 3. 使用情况访问事件判定（主通道，精准）
-        if (hasUsageAccess(ctx)) {
+        if (hasUsageAccessCached(ctx)) {
             val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val end = System.currentTimeMillis()
             val begin = end - 2 * Prefs.keepAliveIntervalMs(ctx).coerceAtLeast(30_000L)
@@ -225,12 +234,19 @@ object KeepAliveEngine {
             if (alive) return true
         }
 
-        // 5. Root / Shizuku 通道精准判定（pidof）
+        // 5. Root / Shizuku 通道精准判定（pidof，结果独立缓存 20s 降低进程 fork 频率）
         if (Privilege.bestChannel(ctx) != Privilege.Channel.NONE) {
-            val out = Privilege.execShell(ctx, "pidof", pkg) ?: ""
-            if (out.isNotBlank() && !out.contains("error", ignoreCase = true)) {
-                return true // 有 pid = 进程存活
+            val nowMs = SystemClock.elapsedRealtime()
+            val cachedPid = pidofCache[pkg]
+            val pidAlive = if (cachedPid != null && nowMs - cachedPid.first < PIDOF_CACHE_MS) {
+                cachedPid.second
+            } else {
+                val out = Privilege.execShell(ctx, "pidof", pkg) ?: ""
+                val v = out.isNotBlank() && !out.contains("error", ignoreCase = true)
+                pidofCache[pkg] = nowMs to v
+                v
             }
+            if (pidAlive) return true // 有 pid = 进程存活
         }
 
         // 6. 无障碍窗口事件参考：近 60 秒有窗口事件 = 存活
@@ -240,6 +256,16 @@ object KeepAliveEngine {
 
         // 7. 无法判定：按用户需求"被杀后台直接拉起"，视为掉线
         return false
+    }
+
+    /** 使用情况访问权限检测（结果缓存 60s，避免高频 queryEvents 带来的系统开销）。 */
+    private fun hasUsageAccessCached(ctx: Context): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        val c = usageAccessCached
+        if (c != null && now - c.first < USAGE_ACCESS_CACHE_MS) return c.second
+        val v = hasUsageAccess(ctx)
+        usageAccessCached = now to v
+        return v
     }
 
     private fun hasUsageAccess(ctx: Context): Boolean = try {

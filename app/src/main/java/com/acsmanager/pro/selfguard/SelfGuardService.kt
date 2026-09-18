@@ -256,6 +256,7 @@ class SelfGuardService : Service() {
             scope.launch {
                 val fixed = withContext(Dispatchers.IO) {
                     try {
+                        // Root / Shizuku 统一走 execShell（带转义与结果判定）；APP_GRANTED 直写
                         when (Privilege.bestChannel(this@SelfGuardService)) {
                             Privilege.Channel.APP_GRANTED -> {
                                 android.provider.Settings.Secure.putString(
@@ -263,13 +264,13 @@ class SelfGuardService : Service() {
                                 )
                                 true
                             }
-                            Privilege.Channel.ROOT -> {
-                                val out = Privilege.runShell(arrayOf("su", "-c", "settings put secure accessibility_enabled 1"))
+                            Privilege.Channel.ROOT, Privilege.Channel.SHIZUKU -> {
+                                val out = Privilege.execShell(
+                                    this@SelfGuardService,
+                                    "settings", "put", "secure", "accessibility_enabled", "1"
+                                )
+                                // 空输出 = 成功；null/error = 失败
                                 out != null && !out.contains("error", ignoreCase = true)
-                            }
-                            Privilege.Channel.SHIZUKU -> {
-                                Privilege.shizukuExec(this@SelfGuardService, "settings", "put", "secure", "accessibility_enabled", "1")
-                                true
                             }
                             else -> false
                         }

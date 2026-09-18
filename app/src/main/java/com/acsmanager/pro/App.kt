@@ -47,6 +47,12 @@ class App : Application() {
     private val binderDeadListener = rikka.shizuku.Shizuku.OnBinderDeadListener {
         Log.w(TAG, "Shizuku binder dead")
         shizukuBinderAlive = false
+        // 联动清理 Privilege 中缓存的 UserService 绑定，避免复用失效 binder
+        try {
+            com.acsmanager.pro.core.Privilege.onShizukuBinderDead()
+        } catch (t: Throwable) {
+            Log.w(TAG, "clear privilege state failed", t)
+        }
     }
 
     /**

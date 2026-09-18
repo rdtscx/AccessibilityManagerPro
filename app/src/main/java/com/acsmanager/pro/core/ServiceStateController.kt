@@ -107,19 +107,7 @@ object ServiceStateController {
     suspend fun disableAll(ctx: Context): Result = withContext(Dispatchers.IO) {
         val result = writeServices(ctx, emptyList())
         if (result.ok) {
-            try {
-                when (Privilege.bestChannel(ctx)) {
-                    Privilege.Channel.APP_GRANTED ->
-                        Settings.Secure.putString(ctx.contentResolver, KEY_ENABLED, "0")
-                    Privilege.Channel.ROOT ->
-                        Privilege.runShell(arrayOf("su", "-c", "settings put secure $KEY_ENABLED 0"))
-                    Privilege.Channel.SHIZUKU ->
-                        Privilege.shizukuExec(ctx, "settings", "put", "secure", KEY_ENABLED, "0")
-                    else -> Unit
-                }
-            } catch (t: Throwable) {
-                Log.w(TAG, "disable accessibility_enabled failed", t)
-            }
+            execSecureSetting(ctx, KEY_ENABLED, "0")
             EventLog.record(ctx, EventLog.TYPE_DISABLE, "system", "all services disabled")
         }
         result
@@ -138,13 +126,9 @@ object ServiceStateController {
                 }
                 Result(ok, channel, if (ok) "ok" else "write failed")
             }
-            Privilege.Channel.ROOT -> {
-                val out = Privilege.runShell(arrayOf("su", "-c", "settings put secure $KEY_SERVICES '$value'"))
-                // su 成功时 settings put 无输出（空串也算成功）；失败输出错误文本
-                Result(isExecOk(out), channel, out ?: "exec failed")
-            }
-            Privilege.Channel.SHIZUKU -> {
-                val out = Privilege.shizukuExec(ctx, "settings", "put", "secure", KEY_SERVICES, value)
+            // Root / Shizuku 统一走 execShell（内部对参数做 shell 转义，杜绝特殊字符解析错误）
+            Privilege.Channel.ROOT, Privilege.Channel.SHIZUKU -> {
+                val out = Privilege.execShell(ctx, "settings", "put", "secure", KEY_SERVICES, value)
                 Result(isExecOk(out), channel, out ?: "exec failed")
             }
             else -> Result(false, channel, "no_privilege")
@@ -161,19 +145,22 @@ object ServiceStateController {
         return true
     }
 
-    private fun writeAccessibilityEnabled(ctx: Context) {
+    /** 经当前通道写 accessibility_enabled 全局开关（APP_GRANTED 直写，Root/Shizuku 走 shell）。 */
+    private fun writeAccessibilityEnabled(ctx: Context, value: String = "1") {
+        execSecureSetting(ctx, KEY_ENABLED, value)
+    }
+
+    private fun execSecureSetting(ctx: Context, key: String, value: String) {
         try {
             when (Privilege.bestChannel(ctx)) {
                 Privilege.Channel.APP_GRANTED ->
-                    Settings.Secure.putString(ctx.contentResolver, KEY_ENABLED, "1")
-                Privilege.Channel.ROOT ->
-                    Privilege.runShell(arrayOf("su", "-c", "settings put secure $KEY_ENABLED 1"))
-                Privilege.Channel.SHIZUKU ->
-                    Privilege.shizukuExec(ctx, "settings", "put", "secure", KEY_ENABLED, "1")
+                    Settings.Secure.putString(ctx.contentResolver, key, value)
+                Privilege.Channel.ROOT, Privilege.Channel.SHIZUKU ->
+                    Privilege.execShell(ctx, "settings", "put", "secure", key, value)
                 else -> Unit
             }
         } catch (t: Throwable) {
-            Log.w(TAG, "write accessibility_enabled failed", t)
+            Log.w(TAG, "write $key failed", t)
         }
     }
 }
