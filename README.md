@@ -1,4 +1,4 @@
-# 无障碍管理器 Pro（Accessibility Manager Pro）v2.0.3
+# 无障碍管理器 Pro（Accessibility Manager Pro）v2.0.4
 
 一款基于 Android 无障碍服务体系的**多功能管理器**。原理与原版「无障碍管理器（com.accessibilitymanager）」一致：
 读取系统 `AccessibilityManager` 真实服务列表，通过 `WRITE_SECURE_SETTINGS`（ADB 授权 / Root / Shizuku 三种通道）
@@ -7,6 +7,14 @@
 
 > ⚠️ 无障碍服务可读取屏幕内容（含账号、验证码等敏感信息）。本应用自身的无障碍服务**不读取屏幕内容**
 > （仅监听窗口切换事件），但请在系统设置中确认授权对象后再启用。本应用仅供合法用途。
+
+## v2.0.4 更新内容
+
+### Bug 修复（重要）
+
+- **修复 Shizuku 应用管理中开关授权不生效、且打开本应用后本应用从列表消失的问题**：根因有两处：
+  1. **`CommandService` 错误声明了 `android:process=":shizuku"`**：Shizuku UserService 由 Shizuku 服务器在其自行管理的独立进程中启动（进程名通过 `UserServiceArgs.processNameSuffix` 决定），**严禁**在 Manifest 中手动指定 `android:process`。手动指定后，Shizuku 服务端在授权校验时检测到 UserService 进程配置异常，导致应用管理中的开关打开后授权不生效（`checkSelfPermission()` 仍返回未授权）；且当本应用启动并与 Shizuku 通信时，服务端将其标记为"配置异常的客户端"并从应用管理列表中移除。已移除该属性。
+  2. **Application 未注册 Shizuku V3 客户端必需的 `OnBinderReceivedListener`**：Shizuku API 13.x（V3 协议）要求客户端在 `Application.onCreate` 中注册 Binder 连接/断开监听器，服务端通过客户端是否正确响应连接事件来判断 V3 兼容性。缺少监听器会加剧上述"标记为不兼容并从列表移除"的行为。已在 `App.kt` 中全局注册 `OnBinderReceivedListener` + `OnBinderDeadListener`，并在 `Privilege.kt` 中优先使用全局维护的 Binder 存活状态，避免每次检测都跨进程 ping 触发服务端兼容性校验。
 
 ## v2.0.3 更新内容
 
@@ -253,7 +261,7 @@ app/src/main/java/com/acsmanager/pro/
 ├── notif/       # 通知 0-5 级调控引擎（NotificationListenerService）
 ├── dev/         # 开发者选项映射（直写 Settings + Root/Shizuku 兜底）
 ├── watchdog/    # 服务保活看门狗前台服务 + 开机自启接收器
-├── shizuku/     # Shizuku UserService 命令执行服务(:shizuku 进程)
+├── shizuku/     # Shizuku UserService 命令执行服务（由 Shizuku 服务器在独立进程启动，具备 shell 权限）
 ├── quick/       # 快捷设置磁贴 + 桌面小部件
 ├── ui/          # 首页/保活/通知/开发者/实验 + 服务管理/监控/设置 + 授权向导 + 无障碍权限总控 + 权限管理
 └── util/        # 偏好设置（含保活名单、通知等级、无障碍锁定集合、统计、实验配置）

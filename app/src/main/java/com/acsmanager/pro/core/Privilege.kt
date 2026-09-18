@@ -58,10 +58,16 @@ object Privilege {
         false
     }
 
-    fun shizukuConnected(): Boolean = if (Build.VERSION.SDK_INT < MIN_SHIZUKU_API) false else try {
-        Shizuku.pingBinder()
-    } catch (t: Throwable) {
-        false
+    fun shizukuConnected(): Boolean {
+        if (Build.VERSION.SDK_INT < MIN_SHIZUKU_API) return false
+        return try {
+            // 优先使用 Application 中维护的 Binder 存活状态（由 OnBinderReceived/Dead 监听器实时更新），
+            // 避免每次检测都跨进程 ping 导致 Shizuku 服务端频繁校验客户端兼容性。
+            if (com.acsmanager.pro.App.shizukuBinderAlive) return true
+            Shizuku.pingBinder()
+        } catch (t: Throwable) {
+            false
+        }
     }
 
     fun shizukuGranted(): Boolean = if (Build.VERSION.SDK_INT < MIN_SHIZUKU_API) false else try {
@@ -120,28 +126,6 @@ object Privilege {
     /** 主线程 Handler（复用，避免每次 ensureShizuku 都创建新对象）。 */
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
-    /** Shizuku Binder 死亡监听：Shizuku 服务被杀死时及时清理状态，避免后续使用失效 binder。 */
-    private val binderDeadListener = rikka.shizuku.Shizuku.OnBinderDeadListener {
-        Log.w(TAG, "Shizuku binder dead, clearing state")
-        shizukuBinder = null
-        shizukuBound = false
-    }
-
-    @Volatile
-    private var deadListenerRegistered = false
-
-    /** 注册 Shizuku Binder 死亡监听（幂等，仅注册一次）。 */
-    private fun ensureBinderDeadListener() {
-        if (deadListenerRegistered) return
-        if (Build.VERSION.SDK_INT < MIN_SHIZUKU_API) return
-        try {
-            rikka.shizuku.Shizuku.addBinderDeadListener(binderDeadListener)
-            deadListenerRegistered = true
-        } catch (t: Throwable) {
-            Log.w(TAG, "register binder dead listener failed", t)
-        }
-    }
-
     /** Shizuku 状态细分（首页授权卡片展示用）。 */
     enum class ShizukuStatus {
         NOT_INSTALLED,   // 未安装 Shizuku
@@ -168,7 +152,6 @@ object Privilege {
      */
     fun ensureShizuku(ctx: Context): Boolean {
         if (Build.VERSION.SDK_INT < MIN_SHIZUKU_API) return false
-        ensureBinderDeadListener()
         if (shizukuBinder != null && shizukuBound) return true
         if (!shizukuReady()) return false
 

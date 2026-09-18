@@ -132,11 +132,12 @@
                 android:value="accessibility_service_keep_alive" />
         </service>
 
-        <!-- Shizuku UserService：运行在 Shizuku 进程，用于执行系统命令 -->
+        <!-- Shizuku UserService：由 Shizuku 服务器在其管理的独立进程中启动，具备 shell 权限。
+             严禁声明 android:process——Shizuku 自行通过 UserServiceArgs.processNameSuffix 管理进程名，
+             手动指定进程名会导致 Shizuku 授权校验失败（应用管理开关不生效）并在应用启动后从列表消失。 -->
         <service
             android:name=".shizuku.CommandService"
-            android:exported="false"
-            android:process=":shizuku" />
+            android:exported="false" />
 
         <!-- 快捷设置磁贴：一键启停常用无障碍服务 -->
         <service
