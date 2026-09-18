@@ -47,6 +47,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AccessibilityManagerPro">
 
+        <!-- Shizuku V3 客户端标识：Shizuku 应用管理页面通过此 meta-data + API_V23 权限联合识别本应用；
+             缺少任一项都不会出现在 Shizuku 应用管理列表中 -->
+        <meta-data
+            android:name="moe.shizuku.client.V3_SUPPORT"
+            android:value="true" />
+
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
