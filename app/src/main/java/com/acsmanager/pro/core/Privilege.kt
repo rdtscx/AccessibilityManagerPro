@@ -117,6 +117,31 @@ object Privilege {
     private var shizukuBinder: IBinder? = null
     private var shizukuBound = false
 
+    /** 主线程 Handler（复用，避免每次 ensureShizuku 都创建新对象）。 */
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /** Shizuku Binder 死亡监听：Shizuku 服务被杀死时及时清理状态，避免后续使用失效 binder。 */
+    private val binderDeadListener = rikka.shizuku.Shizuku.OnBinderDeadListener {
+        Log.w(TAG, "Shizuku binder dead, clearing state")
+        shizukuBinder = null
+        shizukuBound = false
+    }
+
+    @Volatile
+    private var deadListenerRegistered = false
+
+    /** 注册 Shizuku Binder 死亡监听（幂等，仅注册一次）。 */
+    private fun ensureBinderDeadListener() {
+        if (deadListenerRegistered) return
+        if (Build.VERSION.SDK_INT < MIN_SHIZUKU_API) return
+        try {
+            rikka.shizuku.Shizuku.addBinderDeadListener(binderDeadListener)
+            deadListenerRegistered = true
+        } catch (t: Throwable) {
+            Log.w(TAG, "register binder dead listener failed", t)
+        }
+    }
+
     /** Shizuku 状态细分（首页授权卡片展示用）。 */
     enum class ShizukuStatus {
         NOT_INSTALLED,   // 未安装 Shizuku
@@ -132,29 +157,29 @@ object Privilege {
         else -> ShizukuStatus.READY
     }
 
-    private val shizukuConn = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            shizukuBinder = service
-        }
-
-        override fun onServiceDisconnected(name: ComponentName?) {
-            shizukuBinder = null
-            shizukuBound = false
-        }
-    }
-
     /**
      * 确保已绑定 CommandService（运行在 Shizuku 进程，具备 shell 权限）。
      * Shizuku.bindUserService 需在主线程调用，绑定异步回调；失败自动重试一次。
+     *
+     * 修复要点：
+     *  - 解绑使用 Shizuku.unbindUserService（而非 ctx.unbindService，后者用于普通 Service）；
+     *  - 注册 Binder 死亡监听，Shizuku 服务被杀时及时清理状态；
+     *  - UserServiceArgs 设置 version 和 processNameSuffix，符合 Shizuku 官方推荐。
      */
     fun ensureShizuku(ctx: Context): Boolean {
         if (Build.VERSION.SDK_INT < MIN_SHIZUKU_API) return false
+        ensureBinderDeadListener()
         if (shizukuBinder != null && shizukuBound) return true
         if (!shizukuReady()) return false
-        val main = android.os.Handler(android.os.Looper.getMainLooper())
+
         for (attempt in 1..2) {
             val latch = java.util.concurrent.CountDownLatch(1)
             var connected = false
+            val cn = ComponentName(ctx, CommandService::class.java)
+            val args = rikka.shizuku.Shizuku.UserServiceArgs(cn)
+                .daemon(false)
+                .version(1)
+                .processNameSuffix("command")
             val conn = object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                     shizukuBinder = service
@@ -170,10 +195,9 @@ object Privilege {
                 }
             }
             try {
-                main.post {
+                mainHandler.post {
                     try {
-                        val cn = ComponentName(ctx, CommandService::class.java)
-                        Shizuku.bindUserService(Shizuku.UserServiceArgs(cn), conn)
+                        rikka.shizuku.Shizuku.bindUserService(args, conn)
                     } catch (t: Throwable) {
                         Log.w(TAG, "bindUserService failed", t)
                         latch.countDown()
@@ -187,7 +211,15 @@ object Privilege {
             } finally {
                 if (!connected) {
                     try {
-                        main.post { ctx.unbindService(conn) }
+                        // 修复：Shizuku.unbindUserService 需要 (UserServiceArgs, ServiceConnection, boolean) 三个参数
+                        // remove=true 表示同时杀死远程 UserService 进程（Shizuku 不会自动杀死 UserService）
+                        mainHandler.post {
+                            try {
+                                rikka.shizuku.Shizuku.unbindUserService(args, conn, true)
+                            } catch (t: Throwable) {
+                                Log.w(TAG, "unbindUserService failed", t)
+                            }
+                        }
                     } catch (t: Throwable) {
                     }
                 }
@@ -201,21 +233,22 @@ object Privilege {
         if (!shizukuReady()) return null
         if (!ensureShizuku(ctx)) return null
         val binder = shizukuBinder ?: return null
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
         return try {
-            val data = Parcel.obtain()
-            val reply = Parcel.obtain()
             data.writeInterfaceToken(CommandService.DESCRIPTOR)
             data.writeStringArray(cmd)
             binder.transact(CommandService.CODE_EXEC, data, reply, 0)
-            val out = reply.readString()
-            data.recycle()
-            reply.recycle()
-            out
+            reply.readString()
         } catch (t: Throwable) {
             Log.w(TAG, "shizuku exec failed", t)
             shizukuBinder = null
             shizukuBound = false
             null
+        } finally {
+            // 修复：使用 try-finally 确保 Parcel 资源被回收，避免 transact 异常时泄漏
+            data.recycle()
+            reply.recycle()
         }
     }
 }
