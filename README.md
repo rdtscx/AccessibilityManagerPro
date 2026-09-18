@@ -1,4 +1,4 @@
-# 无障碍管理器 Pro（Accessibility Manager Pro）v2.0.0
+# 无障碍管理器 Pro（Accessibility Manager Pro）v2.0.1
 
 一款基于 Android 无障碍服务体系的**多功能管理器**。原理与原版「无障碍管理器（com.accessibilitymanager）」一致：
 读取系统 `AccessibilityManager` 真实服务列表，通过 `WRITE_SECURE_SETTINGS`（ADB 授权 / Root / Shizuku 三种通道）
@@ -7,6 +7,22 @@
 
 > ⚠️ 无障碍服务可读取屏幕内容（含账号、验证码等敏感信息）。本应用自身的无障碍服务**不读取屏幕内容**
 > （仅监听窗口切换事件），但请在系统设置中确认授权对象后再启用。本应用仅供合法用途。
+
+## v2.0.1 更新内容
+
+### Bug 修复（参照 Shizuku 官方 API 文档）
+
+- **修复 unbindUserService 调用错误（重要）**：原代码使用 `ctx.unbindService(conn)` 解绑 Shizuku UserService，这是完全错误的（该方法用于普通 Service，而非 Shizuku UserService）。`Shizuku.unbindUserService` 实际需要三个参数 `(UserServiceArgs, ServiceConnection, boolean remove)`；`remove=true` 时同时杀死远程 UserService 进程（Shizuku 不会自动杀死 UserService，需主动销毁）。
+- **修复 shizukuExec 中 Parcel 资源泄漏**：原代码在 `binder.transact` 抛出异常时，`data.recycle()` 和 `reply.recycle()` 不会被调用。改用 `try-finally` 确保 Parcel 资源始终被回收。
+- **添加 Shizuku Binder 死亡监听**：注册 `Shizuku.addBinderDeadListener`，Shizuku 服务被杀时及时清理 `shizukuBinder` / `shizukuBound` 状态，避免后续使用失效 binder 导致异常或状态错乱。
+- **移除冗余的 `shizukuConn` 字段**（从未被使用，纯死代码）。
+- **UserServiceArgs 完善配置**：设置 `version(1)` 和 `processNameSuffix("command")`，符合 Shizuku 官方推荐。
+- **复用主线程 Handler**：避免每次 `ensureShizuku` 都创建新 Handler 对象。
+
+### CommandService 优化
+
+- **实现 UserService 销毁方法**（transaction code `16777115`，Shizuku 官方约定）：解绑时可主动停止 UserService 进程，避免 Shizuku 进程中残留服务实例。
+- **命令执行增加 30 秒超时保护**：防止命令挂起导致 Shizuku 进程 binder 线程阻塞，超时后强制销毁进程并返回错误。
 
 ## v2.0.0 更新内容
 
