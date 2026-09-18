@@ -157,10 +157,18 @@ object KeepAliveEngine {
         if (cached != null && SystemClock.elapsedRealtime() - cached.first < 10_000L) {
             return cached.second
         }
-        // 缓存超上限时清理过期条目（防止内存泄漏）
+        // 缓存超上限时清理过期条目（防止内存泄漏）；若清理后仍超限，强制移除最旧的条目
         if (aliveCache.size > ALIVE_CACHE_MAX) {
             val now = SystemClock.elapsedRealtime()
             aliveCache.entries.removeAll { now - it.value.first >= 10_000L }
+            if (aliveCache.size > ALIVE_CACHE_MAX) {
+                // 所有条目都未过期（极端情况），按时间戳移除最旧的 1/4
+                val toRemove = aliveCache.entries
+                    .sortedBy { it.value.first }
+                    .take(aliveCache.size / 4)
+                    .map { it.key }
+                for (k in toRemove) aliveCache.remove(k)
+            }
         }
         val result = checkAlive(ctx, pkg)
         aliveCache[pkg] = SystemClock.elapsedRealtime() to result

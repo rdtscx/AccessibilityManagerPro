@@ -252,23 +252,34 @@ class SelfGuardService : Service() {
         val hasProtectedEnabled = protectedAll.any { it in enabled }
         if (hasProtectedEnabled && !AccessServiceRepo.isAccessibilityEnabled(this)) {
             Log.w(TAG, "accessibility_enabled=0 but protected services present, fixing...")
+            EventLog.record(this, EventLog.TYPE_WARN, packageName, "accessibility_enabled=0, auto-fixing")
             scope.launch {
-                withContext(Dispatchers.IO) {
+                val fixed = withContext(Dispatchers.IO) {
                     try {
                         when (Privilege.bestChannel(this@SelfGuardService)) {
-                            Privilege.Channel.APP_GRANTED ->
+                            Privilege.Channel.APP_GRANTED -> {
                                 android.provider.Settings.Secure.putString(
                                     contentResolver, "accessibility_enabled", "1"
                                 )
-                            Privilege.Channel.ROOT ->
-                                Privilege.runShell(arrayOf("su", "-c", "settings put secure accessibility_enabled 1"))
-                            Privilege.Channel.SHIZUKU ->
+                                true
+                            }
+                            Privilege.Channel.ROOT -> {
+                                val out = Privilege.runShell(arrayOf("su", "-c", "settings put secure accessibility_enabled 1"))
+                                out != null && !out.contains("error", ignoreCase = true)
+                            }
+                            Privilege.Channel.SHIZUKU -> {
                                 Privilege.shizukuExec(this@SelfGuardService, "settings", "put", "secure", "accessibility_enabled", "1")
-                            else -> Unit
+                                true
+                            }
+                            else -> false
                         }
                     } catch (t: Throwable) {
                         Log.w(TAG, "fix accessibility_enabled failed", t)
+                        false
                     }
+                }
+                if (fixed) {
+                    EventLog.record(this@SelfGuardService, EventLog.TYPE_RESTORED, packageName, "accessibility_enabled restored to 1")
                 }
             }
         }
@@ -326,10 +337,16 @@ class SelfGuardService : Service() {
      *  - 单个服务恢复失败不影响其他服务，逐条处理提高整体成功率。
      */
     private fun attemptRestore(comps: List<String>, attempt: Int = 1) {
-        for (c in comps) restoringServices.remove(c)
+        // 注意：不在此处从 restoringServices 移除服务——恢复是异步执行的，
+        // 若提前移除，onSecureChanged 可能在恢复期间再次触发并重复加入 pending，
+        // 导致重复恢复和重复事件记录。改为恢复完成（成功或最终失败）后再移除。
         val enabled = AccessServiceRepo.enabledStrings(this)
         val missing = comps.filter { it !in enabled }
-        if (missing.isEmpty()) return
+        if (missing.isEmpty()) {
+            // 服务已被其他流程恢复，从 restoringServices 移除
+            for (c in comps) restoringServices.remove(c)
+            return
+        }
 
         val selfComp = selfComponent(this).flattenToString()
 
@@ -351,6 +368,8 @@ class SelfGuardService : Service() {
                         "restore blocked: no privilege"
                     )
                 }
+                // 无通道时无法恢复，从 restoringServices 移除
+                for (c in comps) restoringServices.remove(c)
                 return@launch
             }
 
@@ -390,6 +409,9 @@ class SelfGuardService : Service() {
                 notifyRestored(successList.size)
             }
 
+            // 成功的服务从 restoringServices 移除
+            for (c in successList) restoringServices.remove(c)
+
             // 失败重试：最多 3 次，指数退避
             if (failList.isNotEmpty() && attempt < 3) {
                 val retryDelay = when (attempt) {
@@ -398,12 +420,16 @@ class SelfGuardService : Service() {
                     else -> 2000L
                 }
                 val retryComps = failList.map { it.first }
-                for (c in retryComps) restoringServices.add(c)
+                // 重试的服务保持在 restoringServices 中，防止重复触发
                 Log.w(TAG, "retry restore (attempt ${attempt + 1}) after ${retryDelay}ms: $retryComps")
                 handler.postDelayed({ attemptRestore(retryComps, attempt + 1) }, retryDelay)
-            } else if (failList.isNotEmpty() && selfComp in failList.map { it.first }) {
-                // 自身服务最终恢复失败时引导用户
-                notifyGuide()
+            } else {
+                // 最终失败的服务从 restoringServices 移除
+                for ((flat, _) in failList) restoringServices.remove(flat)
+                if (failList.isNotEmpty() && selfComp in failList.map { it.first }) {
+                    // 自身服务最终恢复失败时引导用户
+                    notifyGuide()
+                }
             }
         }
     }

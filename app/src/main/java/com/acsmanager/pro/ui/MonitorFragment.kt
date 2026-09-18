@@ -8,6 +8,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.acsmanager.pro.R
+import com.acsmanager.pro.core.AccessibilitySettingsObserver
 import com.acsmanager.pro.databinding.FragmentMonitorBinding
 import com.acsmanager.pro.ui.adapter.EventAdapter
 import com.acsmanager.pro.watchdog.EventLog
@@ -24,6 +25,9 @@ class MonitorFragment : Fragment() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val adapter by lazy { EventAdapter(requireContext()) }
 
+    /** 监听 Settings.Secure 变化：无障碍服务状态变化时自动刷新事件日志。 */
+    private var settingsObserver: AccessibilitySettingsObserver? = null
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -34,6 +38,10 @@ class MonitorFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         binding.eventList.layoutManager = LinearLayoutManager(requireContext())
         binding.eventList.adapter = adapter
+
+        settingsObserver = AccessibilitySettingsObserver(requireContext()) {
+            load()
+        }
 
         binding.btnClear.setOnClickListener {
             AlertDialog.Builder(requireContext())
@@ -47,6 +55,16 @@ class MonitorFragment : Fragment() {
                 .show()
         }
         load()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        settingsObserver?.register()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        settingsObserver?.unregister()
     }
 
     override fun onResume() {
