@@ -20,7 +20,6 @@
     <string name="status_shizuku_no_perm">Shizuku：已连接，但未授权本应用</string>
     <string name="status_shizuku_not_connected">Shizuku：已安装，未启动</string>
     <string name="status_shizuku_not_installed">Shizuku：未安装（可前往授权向导）</string>
-    <string name="status_shizuku_low_api">Shizuku：需 Android 7.0+</string>
     <string name="status_shizuku_grant">一键授权 Shizuku</string>
     <string name="status_shizuku_start">去启动 Shizuku</string>
     <string name="status_watchdog">保活看门狗</string>
@@ -36,24 +35,19 @@
     <string name="cap_screenshot">截屏</string>
     <string name="cap_magnify">放大控制</string>
     <string name="cap_touch">触控探索</string>
-    <string name="cap_web">网页增强</string>
     <string name="cap_other">其他</string>
 
     <!-- Detail -->
     <string name="detail_enabled">已启用</string>
     <string name="detail_disabled">未启用</string>
-    <string name="detail_package">包名</string>
-    <string name="detail_component">组件</string>
     <string name="detail_summary">摘要</string>
     <string name="detail_description">说明</string>
     <string name="detail_capabilities">能力</string>
-    <string name="detail_settings_activity">内置设置页</string>
     <string name="detail_actions">操作</string>
     <string name="action_enable">启用服务</string>
     <string name="action_disable">停用服务</string>
     <string name="action_open_app">应用信息</string>
     <string name="action_sys_settings">系统无障碍设置</string>
-    <string name="action_open_settings_activity">打开内置设置</string>
     <string name="keep_alive">加入保活列表</string>
     <string name="keep_alive_summary">被系统重置后自动恢复该服务</string>
     <string name="no_settings_activity">该服务未提供内置设置页</string>
@@ -95,7 +89,6 @@
     <string name="theme_system">跟随系统</string>
     <string name="theme_light">浅色</string>
     <string name="theme_dark">深色</string>
-    <string name="settings_other">其他</string>
     <string name="settings_disable_all">一键停用全部无障碍服务</string>
     <string name="settings_disable_all_confirm">确定停用全部无障碍服务？该操作会立即生效。</string>
     <string name="settings_about">关于</string>
@@ -153,10 +146,7 @@
     <string name="watchdog_restored_notif">已自动恢复 %1$d 个被重置的服务</string>
     <string name="watchdog_fail_notif">%1$d 个服务恢复失败，请检查授权通道</string>
     <string name="notification_channel_watchdog">保活通知</string>
-    <string name="notification_permission_denied">通知权限未开启，保活仍会运行</string>
-    <string name="select_service">选择服务</string>
     <string name="none">无</string>
-    <string name="enabled_count_badge">%1$d 启用</string>
 
     <!-- Bottom nav（新版） -->
     <string name="tab_home">首页</string>
@@ -288,7 +278,6 @@
     <string name="exp_interval">保活巡检间隔</string>
     <string name="exp_interval_value">%1$d 秒</string>
     <string name="exp_notif_history">通知拦截历史</string>
-    <string name="exp_notif_history_desc">记录 0/1 档拦截的通知（最多 200 条，本地存储）</string>
     <string name="exp_notif_override">精细调控通道</string>
     <string name="exp_notif_override_desc">尝试用系统命令升降级通知重要性（需 Root/Shizuku/ADB + Android 14+）</string>
     <string name="exp_tools">自检与工具</string>
