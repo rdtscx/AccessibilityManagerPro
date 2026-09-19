@@ -12,8 +12,8 @@ android {
         // 适配 Android 5.0（API 21）~ 最新系统：最低 API 21，所有新 API 调用均带版本守卫
         minSdk = 21
         targetSdk = 34
-        versionCode = 21
-        versionName = "3.0.0"
+        versionCode = 22
+        versionName = "3.0.1"
         // 资源瘦身：仅保留中/英文，其余语言资源不打包
         resConfigs("zh", "en")
     }

@@ -50,7 +50,7 @@ class DevOptionAdapter : RecyclerView.Adapter<DevOptionAdapter.Holder>() {
             scope.launch {
                 val r = withContext(Dispatchers.IO) { DevOptions.writeBool(ctx, o, value) }
                 writing = false
-                showResult(o, r)
+                showResult(r)
             }
         }
 
@@ -61,11 +61,11 @@ class DevOptionAdapter : RecyclerView.Adapter<DevOptionAdapter.Holder>() {
             scope.launch {
                 val r = withContext(Dispatchers.IO) { DevOptions.writeFloat(ctx, o, value) }
                 writing = false
-                showResult(o, r)
+                showResult(r)
             }
         }
 
-        private fun showResult(o: DevOptions.Option, r: DevOptions.WriteResult) {
+        private fun showResult(r: DevOptions.WriteResult) {
             val ctx = binding.root.context
             if (r.ok) {
                 binding.tvStatus.text = ctx.getString(

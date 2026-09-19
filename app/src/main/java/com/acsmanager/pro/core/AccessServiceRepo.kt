@@ -46,7 +46,7 @@ object AccessServiceRepo {
             AccessServiceItem(
                 component = cn,
                 packageName = si.packageName,
-                label = info.resolveInfo.loadLabel(context.packageManager)?.toString() ?: si.name,
+                label = info.resolveInfo.loadLabel(context.packageManager).toString(),
                 summary = if (android.os.Build.VERSION.SDK_INT >= 24) {
                     try {
                         info.loadSummary(context.packageManager)?.toString()
@@ -56,7 +56,12 @@ object AccessServiceRepo {
                 } else {
                     null
                 },
-                description = info.description?.toString(),
+                // API 30+ description 字段已废弃，改用 loadDescription() 加载
+                description = try {
+                    info.loadDescription(context.packageManager)?.toString()
+                } catch (t: Throwable) {
+                    null
+                },
                 enabled = cn in enabledComponents,
                 capabilities = info.capabilities,
                 feedbackType = info.feedbackType,

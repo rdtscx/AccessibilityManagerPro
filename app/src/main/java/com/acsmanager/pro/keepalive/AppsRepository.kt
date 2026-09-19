@@ -50,7 +50,7 @@ object AppsRepository {
         for (ai in apps) {
             if (ai.packageName == ctx.packageName) continue
             val label = try {
-                pm.getApplicationLabel(ai)?.toString() ?: ai.packageName
+                pm.getApplicationLabel(ai).toString()
             } catch (t: Throwable) {
                 ai.packageName
             }
@@ -103,7 +103,7 @@ object AppsRepository {
     /** 应用显示名（用于保活提示等），取不到时返回 null。 */
     fun labelOf(ctx: Context, pkg: String): String? = try {
         val ai = ctx.packageManager.getApplicationInfo(pkg, 0)
-        ctx.packageManager.getApplicationLabel(ai)?.toString()
+        ctx.packageManager.getApplicationLabel(ai).toString()
     } catch (t: Throwable) {
         null
     }

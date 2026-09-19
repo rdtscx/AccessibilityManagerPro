@@ -9,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -37,6 +38,10 @@ class ServicesFragment : Fragment() {
         onItemClick = { openDetail(it) },
         onToggle = { item, enabled -> toggle(item, enabled) }
     )
+
+    // 通知权限请求（现代 Activity Result API，替代废弃的 Fragment.requestPermissions）
+    private val notifPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
 
     /** 监听 Settings.Secure 变化：后台拉起服务后自动刷新列表。 */
     private var settingsObserver: AccessibilitySettingsObserver? = null
@@ -172,7 +177,7 @@ class ServicesFragment : Fragment() {
                 requireContext(), Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
+            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 

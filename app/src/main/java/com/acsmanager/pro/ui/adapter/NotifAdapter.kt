@@ -26,7 +26,7 @@ class NotifAdapter : RecyclerView.Adapter<NotifAdapter.Holder>() {
         private var pkg: String? = null
 
         init {
-            binding.slider.addOnChangeListener { _, value, fromUser ->
+            binding.slider.addOnChangeListener { _, value, _ ->
                 val p = pkg ?: return@addOnChangeListener
                 val level = value.toInt()
                 Prefs.setNotifLevel(binding.root.context, p, level)

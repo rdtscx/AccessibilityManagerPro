@@ -33,16 +33,16 @@ class AccessPermAdapter(
 
         init {
             binding.switchEnabled.setOnCheckedChangeListener { _, checked ->
-                val it = item ?: return@setOnCheckedChangeListener
-                onToggle(it, checked)
+                val cur = item ?: return@setOnCheckedChangeListener
+                onToggle(cur, checked)
             }
             binding.btnLock.setOnClickListener {
-                val it = item ?: return@setOnClickListener
-                onLock(it)
+                val cur = item ?: return@setOnClickListener
+                onLock(cur)
             }
             binding.root.setOnClickListener {
-                val it = item ?: return@setOnClickListener
-                onItemClick(it)
+                val cur = item ?: return@setOnClickListener
+                onItemClick(cur)
             }
         }
 
