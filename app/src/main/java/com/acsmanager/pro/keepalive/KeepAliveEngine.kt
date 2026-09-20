@@ -141,20 +141,29 @@ object KeepAliveEngine {
         targets.keys.removeAll { it !in wanted }
         handler.removeCallbacks(checkRunnable)
         if (targets.isNotEmpty() && service != null) {
-            handler.postDelayed(checkRunnable, Prefs.keepAliveIntervalMs(ctx).coerceIn(10_000L, 300_000L))
+            handler.postDelayed(checkRunnable, Prefs.keepAliveIntervalMs(ctx).coerceIn(3_000L, 120_000L))
         }
     }
 
-    /** 无障碍窗口事件 → 记录前台与窗口时间戳（"最近有窗口事件 = 存活"判定依据）。 */
+    /** 无障碍窗口事件 → 记录前台与窗口时间戳（"最近有窗口事件 = 存活"判定依据）。
+     *  事件驱动：前台切换时立即延迟 1.5 秒触发一次巡检，不等下一个 tick，实现"掉线即拉起"。 */
     fun onForeground(pkg: String, nowMs: Long) {
         val prev = lastForegroundPkg
         lastForegroundPkg = pkg
-        if (prev != pkg) lastForegroundChangeMs = nowMs
+        if (prev != pkg) {
+            lastForegroundChangeMs = nowMs
+            // 前台刚切走：延迟 1.5 秒巡检一次（给系统完成切换/杀进程的时间）
+            handler.removeCallbacks(triggerCheckRunnable)
+            handler.postDelayed(triggerCheckRunnable, 1_500L)
+        }
         targets[pkg]?.let {
             it.lastForegroundMs = nowMs
             it.lastWindowMs = nowMs
         }
     }
+
+    /** 前台切换事件触发的即时巡检（不等 30 秒 tick）。 */
+    private val triggerCheckRunnable = Runnable { runCheck() }
 
     // ---------- 巡检 ----------
 
@@ -164,7 +173,7 @@ object KeepAliveEngine {
             val ctx = service ?: return
             // 名单为空时不再自调度（省电）；有新目标由 reloadTargets 恢复调度
             if (targets.isEmpty()) return
-            handler.postDelayed(this, Prefs.keepAliveIntervalMs(ctx).coerceIn(10_000L, 300_000L))
+            handler.postDelayed(this, Prefs.keepAliveIntervalMs(ctx).coerceIn(3_000L, 120_000L))
         }
     }
 
@@ -175,7 +184,8 @@ object KeepAliveEngine {
 
         val now = SystemClock.elapsedRealtime()
         for (target in targets.values) {
-            if (now - target.lastCheckMs < Prefs.keepAliveIntervalMs(ctx) / 2) continue
+            // 节流：同一目标 2 秒内不重复检查（事件触发的巡检能跑，避免 30 秒 tick 空转）
+            if (now - target.lastCheckMs < 2_000L) continue
             target.lastCheckMs = now
             if (target.pkg == lastForegroundPkg) continue           // 正在前台使用，不打扰
             if (now - target.lastRelaunchMs < Prefs.keepAliveCooldownMs(ctx)) continue

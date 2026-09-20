@@ -237,7 +237,7 @@ object Prefs {
 
     /** 单应用拉起冷却（毫秒），防止与用户操作冲突形成循环。 */
     fun keepAliveCooldownMs(ctx: Context): Long =
-        get(ctx).getLong("keepalive_cooldown", 90_000L)
+        get(ctx).getLong("keepalive_cooldown", 5_000L)
 
     /** 黑屏（熄屏）状态下被杀后台时，是否也拉起保活应用（默认开）。 */
     fun keepAliveBlackScreen(ctx: Context): Boolean =
