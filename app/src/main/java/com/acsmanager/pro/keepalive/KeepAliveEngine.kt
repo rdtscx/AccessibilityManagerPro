@@ -485,8 +485,16 @@ object KeepAliveEngine {
     /** 前台软件包名（供 UI 展示"运行中/前台/已停止"）。 */
     fun lastForeground(): String? = lastForegroundPkg
 
-    /** 目标软件是否在运行（UI 状态点；带缓存）。 */
-    fun isTargetAlive(ctx: Context, pkg: String): Boolean = isAlive(ctx, pkg)
+    /**
+     * 目标软件是否在运行（UI 状态点）。
+     * 纯被动方案下只看窗口事件：近 60 秒有窗口事件 = 运行中，否则已停止。
+     * 不查 usage/pidof（省电），也不沿用"无法判定视为存活"的保活判定逻辑。
+     */
+    fun isTargetAlive(ctx: Context, pkg: String): Boolean {
+        if (pkg == lastForegroundPkg) return true
+        val t = targets[pkg] ?: return false
+        return SystemClock.elapsedRealtime() - t.lastWindowMs < 60_000L
+    }
 
     fun protectedCount(): Int = targets.size
 

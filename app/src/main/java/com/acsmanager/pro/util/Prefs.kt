@@ -460,8 +460,19 @@ object Prefs {
         val raw = get(ctx).getString("notif_history_v2", "[]") ?: "[]"
         try {
             val arr = JSONArray(raw)
+            val now = System.currentTimeMillis()
+            // 同应用同渠道 5 秒内重复通知只记一条（避免刷屏）
+            if (arr.length() > 0) {
+                val last = arr.getJSONObject(arr.length() - 1)
+                val lastT = last.optLong("t", 0L)
+                val lastP = last.optString("p", "")
+                val lastC = last.optString("c", "")
+                if (now - lastT < 5_000L && lastP == pkg && lastC == channelId) {
+                    return // 去重：不重复记录
+                }
+            }
             val o = JSONObject()
-            o.put("t", System.currentTimeMillis())
+            o.put("t", now)
             o.put("p", pkg)
             o.put("c", channelId)
             o.put("ti", title)
