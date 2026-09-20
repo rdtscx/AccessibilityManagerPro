@@ -79,7 +79,19 @@ class KeepAliveAdapter(
             if (isKept) {
                 binding.tvState.text = ctx.getString(R.string.keepalive_status_kept)
                 binding.tvState.setTextColor(ContextCompat.getColor(ctx, R.color.status_ok))
+                // 绿色圆点呼吸动画（精细动作反馈，色系不变）
+                binding.dotKept.animate().cancel()
+                binding.dotKept.alpha = 1f
+                val pulse = android.animation.ObjectAnimator.ofFloat(
+                    binding.dotKept, "alpha", 1f, 0.35f
+                )
+                pulse.duration = 900L
+                pulse.repeatCount = android.view.animation.Animation.INFINITE
+                pulse.repeatMode = android.view.animation.Animation.REVERSE
+                pulse.start()
             } else {
+                binding.dotKept.animate().cancel()
+                binding.dotKept.alpha = 1f
                 val fg = KeepAliveEngine.lastForeground()
                 val state = when {
                     fg == entry.packageName -> R.string.app_state_foreground
