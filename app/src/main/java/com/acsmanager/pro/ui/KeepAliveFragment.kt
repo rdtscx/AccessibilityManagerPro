@@ -149,7 +149,7 @@ class KeepAliveFragment : Fragment() {
     }
 
     private fun applyFilter() {
-        val protected = Prefs.keepAliveApps(requireContext())
+        val protectedSet = Prefs.keepAliveApps(requireContext())
         val q = query.lowercase()
         val filtered = allApps.filter { app ->
             // 主列表只保留可直接打开（有 LaunchIntent）的应用；
@@ -158,11 +158,12 @@ class KeepAliveFragment : Fragment() {
                 (filter == FILTER_ALL ||
                     (filter == FILTER_USER && !app.isSystem) ||
                     (filter == FILTER_SYSTEM && app.isSystem) ||
-                    (filter == FILTER_PROTECTED && app.packageName in protected)) &&
+                    (filter == FILTER_PROTECTED && app.packageName in protectedSet)) &&
                 (q.isEmpty() || app.label.lowercase().contains(q) ||
                     app.packageName.lowercase().contains(q))
-        }
-        adapter.submit(filtered, protected)
+        }.sortedWith(compareByDescending<AppEntry> { it.packageName in protectedSet }
+            .thenBy { it.label.lowercase() })
+        adapter.submit(filtered, protectedSet)
         refreshSummary()
     }
 

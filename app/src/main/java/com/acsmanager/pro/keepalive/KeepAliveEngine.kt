@@ -291,8 +291,8 @@ object KeepAliveEngine {
             return true
         }
 
-        // 7. 无法判定：按用户需求"被杀后台直接拉起"，视为掉线
-        return false
+        // 7. 无法判定：宁可不拉也不误拉——视为存活（只有明确检测到无后台/无服务才拉起）
+        return true
     }
 
     /** 使用情况访问权限检测（结果缓存 60s，避免高频 queryEvents 带来的系统开销）。 */
