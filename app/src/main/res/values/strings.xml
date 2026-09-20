@@ -214,6 +214,13 @@
     <string name="keepalive_delay_value_format">%d ms</string>
     <string name="keepalive_status_kept">已保活</string>
     <string name="notif_filter_set">已设置</string>
+    <string name="notif_history_title">通知拦截历史</string>
+    <string name="notif_act_launch">启动</string>
+    <string name="notif_act_hide">隐藏</string>
+    <string name="notif_act_set_level">调整级别</string>
+    <string name="notif_hidden_toast">已隐藏 %1$s 的该渠道通知</string>
+    <string name="notif_set_level_title">调整 %1$s 的渠道级别</string>
+    <string name="notif_level_saved">已设置为 %1$s</string>
     <string name="cd_app_icon">应用图标</string>
     <string name="app_state_foreground">前台使用中</string>
     <string name="app_state_running">运行中</string>

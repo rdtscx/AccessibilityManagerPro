@@ -340,6 +340,17 @@ object Prefs {
         }
     }
 
+    /** 移除某包的自定义等级（滑回系统默认 3 时调用）。 */
+    fun resetNotifLevel(ctx: Context, pkg: String) {
+        val raw = get(ctx).getString(KEY_NOTIF_LEVELS, "{}") ?: "{}"
+        try {
+            val o = JSONObject(raw)
+            o.remove(pkg)
+            get(ctx).edit().putString(KEY_NOTIF_LEVELS, o.toString()).apply()
+        } catch (t: Throwable) {
+        }
+    }
+
     fun notifLevels(ctx: Context): Map<String, Int> {
         val raw = get(ctx).getString(KEY_NOTIF_LEVELS, null) ?: return emptyMap()
         return try {
@@ -403,6 +414,72 @@ object Prefs {
 
     fun clearNotifHistory(ctx: Context) {
         get(ctx).edit().remove(KEY_NOTIF_HISTORY).apply()
+    }
+
+    // ---------- 单渠道级别 & 隐藏渠道（通知历史二级页用） ----------
+
+    /** 单渠道级别：key = "pkg/channelId"，value = 0~5。优先于应用整体级别。 */
+    fun notifChannelLevel(ctx: Context, pkg: String, channelId: String): Int {
+        val key = "$pkg/$channelId"
+        val raw = get(ctx).getString("notif_channel_levels", "{}") ?: "{}"
+        return try {
+            JSONObject(raw).optInt(key, -1)
+        } catch (t: Throwable) { -1 }
+    }
+
+    fun setNotifChannelLevel(ctx: Context, pkg: String, channelId: String, level: Int) {
+        val key = "$pkg/$channelId"
+        val raw = get(ctx).getString("notif_channel_levels", "{}") ?: "{}"
+        try {
+            val o = JSONObject(raw)
+            o.put(key, level.coerceIn(0, 5))
+            get(ctx).edit().putString("notif_channel_levels", o.toString()).apply()
+        } catch (t: Throwable) {
+        }
+    }
+
+    /** 隐藏渠道集合：遇到该 pkg/channelId 的通知直接取消不显示。 */
+    fun notifHiddenChannels(ctx: Context): Set<String> =
+        get(ctx).getStringSet("notif_hidden_channels", emptySet()) ?: emptySet()
+
+    fun isChannelHidden(ctx: Context, pkg: String, channelId: String): Boolean =
+        "$pkg/$channelId" in notifHiddenChannels(ctx)
+
+    fun setChannelHidden(ctx: Context, pkg: String, channelId: String, hidden: Boolean) {
+        val set = notifHiddenChannels(ctx).toMutableSet()
+        val key = "$pkg/$channelId"
+        if (hidden) set.add(key) else set.remove(key)
+        get(ctx).edit().putStringSet("notif_hidden_channels", set).apply()
+    }
+
+    // ---------- 完整通知历史（二级页列表用） ----------
+
+    /** 追加一条完整通知历史（pkg/channelId/title/text/time）。 */
+    fun appendNotifHistoryFull(ctx: Context, pkg: String, channelId: String, title: String, text: String) {
+        if (!notifHistoryEnabled(ctx)) return
+        val raw = get(ctx).getString("notif_history_v2", "[]") ?: "[]"
+        try {
+            val arr = JSONArray(raw)
+            val o = JSONObject()
+            o.put("t", System.currentTimeMillis())
+            o.put("p", pkg)
+            o.put("c", channelId)
+            o.put("ti", title)
+            o.put("tx", text)
+            arr.put(o)
+            while (arr.length() > 300) arr.remove(0)
+            get(ctx).edit().putString("notif_history_v2", arr.toString()).apply()
+        } catch (t: Throwable) {
+        }
+    }
+
+    fun notifHistoryFull(ctx: Context): JSONArray {
+        val raw = get(ctx).getString("notif_history_v2", "[]") ?: "[]"
+        return try { JSONArray(raw) } catch (t: Throwable) { JSONArray() }
+    }
+
+    fun clearNotifHistoryFull(ctx: Context) {
+        get(ctx).edit().remove("notif_history_v2").apply()
     }
 
     // ---------- 无障碍权限锁定保活（应用级无障碍总控） ----------

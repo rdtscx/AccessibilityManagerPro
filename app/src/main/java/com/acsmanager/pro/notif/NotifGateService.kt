@@ -78,20 +78,38 @@ class NotifGateService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
-        val level = Prefs.notifLevel(this, sbn.packageName)
+        val pkg = sbn.packageName
+        val channelId = sbn.notification.channelId ?: ""
+        // 提取标题和正文（供历史列表展示）
+        val extras = sbn.notification.extras
+        val title = extras?.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString() ?: ""
+        val text = extras?.getCharSequence(android.app.Notification.EXTRA_TEXT)?.toString() ?: ""
+        // 记录完整通知历史（二级页列表用）
+        Prefs.appendNotifHistoryFull(this, pkg, channelId, title, text)
+
+        // 隐藏渠道：直接取消不显示
+        if (Prefs.isChannelHidden(this, pkg, channelId)) {
+            cancelNotification(sbn.key)
+            Prefs.bumpNotifBlock(this)
+            return
+        }
+
+        // 单渠道级别优先于应用整体级别
+        val channelLevel = Prefs.notifChannelLevel(this, pkg, channelId)
+        val level = if (channelLevel >= 0) channelLevel else Prefs.notifLevel(this, pkg)
         when {
             level == 0 -> {
                 // 完全屏蔽：直接拦截取消
                 cancelNotification(sbn.key)
                 Prefs.bumpNotifBlock(this)
-                Prefs.appendNotifHistory(this, sbn.packageName, "block")
-                EventLog.record(this, EventLog.TYPE_DISABLE, sbn.packageName, "notification blocked (L0)")
+                Prefs.appendNotifHistory(this, pkg, "block")
+                EventLog.record(this, EventLog.TYPE_DISABLE, pkg, "notification blocked (L0)")
             }
             level == 1 -> {
                 // 静默收纳：拦截取消 + 记录历史
                 cancelNotification(sbn.key)
-                Prefs.appendNotifHistory(this, sbn.packageName, "silent")
-                EventLog.record(this, EventLog.TYPE_SERVICE, sbn.packageName, "notification silenced (L1)")
+                Prefs.appendNotifHistory(this, pkg, "silent")
+                EventLog.record(this, EventLog.TYPE_SERVICE, pkg, "notification silenced (L1)")
             }
             else -> {
                 // 2-5：尝试精细调控（升降级）

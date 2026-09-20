@@ -103,9 +103,11 @@ class NotifFragment : Fragment() {
         }
     }
 
-    /** 按搜索词 + 筛选 chip 过滤列表（与保活页一致）。 */
+    /** 按搜索词 + 筛选 chip 过滤列表（与保活页一致）。
+     *  "已设置"只显示用户真正改过等级（非默认 3 级）的应用，系统默认不干预的不算。 */
     private fun applyFilter() {
-        val setPkgs = Prefs.notifLevels(requireContext()).keys
+        val ctx = requireContext()
+        val setPkgs = Prefs.notifLevels(ctx).filterValues { it != 3 }.keys
         val q = query.lowercase()
         val filtered = allApps.filter { app ->
             (filter == FILTER_ALL ||

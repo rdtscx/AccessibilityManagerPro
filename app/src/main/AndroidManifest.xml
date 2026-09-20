@@ -91,6 +91,12 @@
             android:exported="false"
             android:parentActivityName=".ui.MainActivity" />
 
+        <!-- 通知拦截历史二级页：记录所有通知，点击可启动/隐藏/调整级别 -->
+        <activity
+            android:name=".ui.NotifHistoryActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
         <!-- 本应用的无障碍服务：低耗电（不读屏幕内容），事件驱动感知前台；被关闭后由自监控延迟 1 秒拉起 -->
         <service
             android:name=".selfguard.SelfAccessService"

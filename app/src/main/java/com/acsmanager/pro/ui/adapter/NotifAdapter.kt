@@ -29,7 +29,12 @@ class NotifAdapter : RecyclerView.Adapter<NotifAdapter.Holder>() {
             binding.slider.addOnChangeListener { _, value, _ ->
                 val p = pkg ?: return@addOnChangeListener
                 val level = value.toInt()
-                Prefs.setNotifLevel(binding.root.context, p, level)
+                // 滑回 3（系统默认）时从记录里移除该包，保持"已设置"只列真正改过的应用
+                if (level == 3) {
+                    Prefs.resetNotifLevel(binding.root.context, p)
+                } else {
+                    Prefs.setNotifLevel(binding.root.context, p, level)
+                }
                 binding.tvLevel.text = binding.root.context.getString(NotifGateService.levelLabelRes(level))
                 binding.tvDesc.text = binding.root.context.getString(NotifGateService.levelDescRes(level))
             }

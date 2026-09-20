@@ -100,6 +100,12 @@ class ExpFragment : Fragment() {
             Prefs.setNotifHistoryEnabled(requireContext(), checked)
         }
 
+        // 点击"通知拦截历史"整行（除 toggle 外）：打开历史二级页
+        binding.rowNotifHistory.setOnClickListener {
+            startActivity(android.content.Intent(requireContext(),
+                com.acsmanager.pro.ui.NotifHistoryActivity::class.java))
+        }
+
         binding.switchNotifOverride.setOnCheckedChangeListener { _, checked ->
             Prefs.setNotifOverrideEnabled(requireContext(), checked)
         }
