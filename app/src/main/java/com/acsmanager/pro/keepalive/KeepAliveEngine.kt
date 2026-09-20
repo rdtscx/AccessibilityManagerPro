@@ -115,12 +115,10 @@ object KeepAliveEngine {
         Log.d(TAG, "doze: keepalive resumed")
     }
 
-    /** 重新加载保活名单；名单非空时确保巡检已调度（名单为空则不调度，零开销）。
-     *  同时加载两类目标：整包保活（[Prefs.keepAliveApps]）+ 单组件保活（[Prefs.keepAliveComponents]）。 */
+    /** 重新加载保活名单；纯被动模式下不启动定时巡检，只靠无障碍窗口事件触发。 */
     fun reloadTargets(ctx: Context) {
         val selectedPkgs = Prefs.keepAliveApps(ctx)
         val selectedComps = Prefs.keepAliveComponents(ctx)
-        // 收集本次应保留的所有 key
         val wanted = HashSet<String>()
         for (pkg in selectedPkgs) {
             val key = targetKey(pkg, null)
@@ -128,7 +126,6 @@ object KeepAliveEngine {
             targets.getOrPut(key) { Target(pkg, null) }
         }
         for (flat in selectedComps) {
-            // flat 形如 "pkg/com.example.MyService"
             val idx = flat.indexOf('/')
             if (idx <= 0 || idx >= flat.length - 1) continue
             val pkg = flat.substring(0, idx)
@@ -137,24 +134,31 @@ object KeepAliveEngine {
             wanted.add(key)
             targets.getOrPut(key) { Target(pkg, cls) }
         }
-        // 清理已取消勾选的旧目标
         targets.keys.removeAll { it !in wanted }
+        // 纯被动：不启动定时巡检，只等无障碍窗口事件
         handler.removeCallbacks(checkRunnable)
-        if (targets.isNotEmpty() && service != null) {
-            handler.postDelayed(checkRunnable, Prefs.keepAliveIntervalMs(ctx).coerceIn(3_000L, 120_000L))
-        }
+        handler.removeCallbacks(triggerCheckRunnable)
     }
 
-    /** 无障碍窗口事件 → 记录前台与窗口时间戳（"最近有窗口事件 = 存活"判定依据）。
-     *  事件驱动：前台切换时立即延迟 1.5 秒触发一次巡检，不等下一个 tick，实现"掉线即拉起"。 */
+    /**
+     * 纯被动方案：无障碍窗口事件驱动。
+     *  - 目标 app 在前台 → 记录时间戳；
+     *  - 目标 app 从前台被切走 → 延迟几秒后确认它没自己回来，没回来就拉起。
+     * 不做定时巡检、不查 usage events、不查 pidof，零轮询开销。
+     */
     fun onForeground(pkg: String, nowMs: Long) {
         val prev = lastForegroundPkg
         lastForegroundPkg = pkg
-        if (prev != pkg) {
+        if (prev != null && prev != pkg) {
             lastForegroundChangeMs = nowMs
-            // 前台刚切走：延迟 1.5 秒巡检一次（给系统完成切换/杀进程的时间）
-            handler.removeCallbacks(triggerCheckRunnable)
-            handler.postDelayed(triggerCheckRunnable, 1_500L)
+            // 上一个前台是保活目标 → 它被切走了，延迟后确认是否需要拉起
+            val prevTarget = targets.values.firstOrNull { it.pkg == prev }
+            if (prevTarget != null) {
+                prevTarget.lastForegroundMs = nowMs
+                // 延迟 3 秒后检查：如果该 app 仍然没回到前台，拉起
+                handler.removeCallbacks(triggerCheckRunnable)
+                handler.postDelayed(triggerCheckRunnable, 3_000L)
+            }
         }
         targets[pkg]?.let {
             it.lastForegroundMs = nowMs
@@ -162,37 +166,25 @@ object KeepAliveEngine {
         }
     }
 
-    /** 前台切换事件触发的即时巡检（不等 30 秒 tick）。 */
-    private val triggerCheckRunnable = Runnable { runCheck() }
-
-    // ---------- 巡检 ----------
-
-    private val checkRunnable = object : Runnable {
-        override fun run() {
-            runCheck()
-            val ctx = service ?: return
-            // 名单为空时不再自调度（省电）；有新目标由 reloadTargets 恢复调度
-            if (targets.isEmpty()) return
-            handler.postDelayed(this, Prefs.keepAliveIntervalMs(ctx).coerceIn(3_000L, 120_000L))
+    /** 被动触发：检查刚被切走的保活目标是否需要拉起。 */
+    private val triggerCheckRunnable = Runnable {
+        val ctx = service ?: return@Runnable
+        if (targets.isEmpty()) return@Runnable
+        val now = SystemClock.elapsedRealtime()
+        for (target in targets.values) {
+            // 正在前台，不打扰
+            if (target.pkg == lastForegroundPkg) continue
+            // 冷却期内不拉
+            if (now - target.lastRelaunchMs < Prefs.keepAliveCooldownMs(ctx)) continue
+            // 黑屏策略/低电量不允许
+            if (!policyAllows(ctx)) continue
+            relaunch(ctx, target)
         }
     }
 
-    private fun runCheck() {
-        val ctx = service ?: return
-        if (targets.isEmpty()) return
-        if (Prefs.keepAlivePauseLowBattery(ctx) && isLowBattery(ctx)) return
-
-        val now = SystemClock.elapsedRealtime()
-        for (target in targets.values) {
-            // 节流：同一目标 2 秒内不重复检查（事件触发的巡检能跑，避免 30 秒 tick 空转）
-            if (now - target.lastCheckMs < 2_000L) continue
-            target.lastCheckMs = now
-            if (target.pkg == lastForegroundPkg) continue           // 正在前台使用，不打扰
-            if (now - target.lastRelaunchMs < Prefs.keepAliveCooldownMs(ctx)) continue
-            if (isAlive(ctx, target.pkg)) continue                  // 还活着，无需拉起
-            if (!policyAllows(ctx)) continue                        // 黑屏策略/低电量等不允许
-            relaunch(ctx, target)
-        }
+    // 兼容旧接口：纯被动模式下不再用定时巡检，保留空实现避免其他调用点崩溃
+    private val checkRunnable = object : Runnable {
+        override fun run() { /* 纯被动：不循环 */ }
     }
 
     // ---------- 存活判定 ----------
