@@ -146,18 +146,22 @@ object KeepAliveEngine {
      *  - 目标 app 从前台被切走 → 延迟几秒后确认它没自己回来，没回来就拉起。
      * 不做定时巡检、不查 usage events、不查 pidof，零轮询开销。
      */
+    /** 被切走、待确认是否需要拉起的目标包名（纯被动：切走后延迟 8 秒再确认进程是否死了）。 */
+    @Volatile private var pendingGonePkg: String? = null
+
     fun onForeground(pkg: String, nowMs: Long) {
         val prev = lastForegroundPkg
         lastForegroundPkg = pkg
         if (prev != null && prev != pkg) {
             lastForegroundChangeMs = nowMs
-            // 上一个前台是保活目标 → 它被切走了，延迟后确认是否需要拉起
+            // 上一个前台是保活目标 → 它被切走了，记录待确认
             val prevTarget = targets.values.firstOrNull { it.pkg == prev }
             if (prevTarget != null) {
                 prevTarget.lastForegroundMs = nowMs
-                // 延迟 3 秒后检查：如果该 app 仍然没回到前台，拉起
+                pendingGonePkg = prev
+                // 延迟 8 秒后检查进程是否真的死了（用户正常切走不会立刻拉回）
                 handler.removeCallbacks(triggerCheckRunnable)
-                handler.postDelayed(triggerCheckRunnable, 3_000L)
+                handler.postDelayed(triggerCheckRunnable, 8_000L)
             }
         }
         targets[pkg]?.let {
@@ -166,20 +170,43 @@ object KeepAliveEngine {
         }
     }
 
-    /** 被动触发：检查刚被切走的保活目标是否需要拉起。 */
+    /** 被动触发：确认被切走的目标进程是否死了，死了才拉起。 */
     private val triggerCheckRunnable = Runnable {
         val ctx = service ?: return@Runnable
-        if (targets.isEmpty()) return@Runnable
+        val gonePkg = pendingGonePkg ?: return@Runnable
+        pendingGonePkg = null
+        val target = targets.values.firstOrNull { it.pkg == gonePkg } ?: return@Runnable
         val now = SystemClock.elapsedRealtime()
-        for (target in targets.values) {
-            // 正在前台，不打扰
-            if (target.pkg == lastForegroundPkg) continue
-            // 冷却期内不拉
-            if (now - target.lastRelaunchMs < Prefs.keepAliveCooldownMs(ctx)) continue
-            // 黑屏策略/低电量不允许
-            if (!policyAllows(ctx)) continue
-            relaunch(ctx, target)
+        // 正在前台，不打扰
+        if (target.pkg == lastForegroundPkg) return@Runnable
+        // 冷却期内不拉
+        if (now - target.lastRelaunchMs < Prefs.keepAliveCooldownMs(ctx)) return@Runnable
+        // 黑屏策略/低电量不允许
+        if (!policyAllows(ctx)) return@Runnable
+        // 这 8 秒内如果它又有窗口事件（自己弹回来），不拉
+        if (now - target.lastWindowMs < 8_000L) return@Runnable
+        // 查一次进程是否还活着：活着就不拉，死了才拉
+        if (processAlive(ctx, target.pkg)) return@Runnable
+        relaunch(ctx, target)
+    }
+
+    /** 轻量进程存活检查：root pidof 优先，否则 runningAppProcesses；查不到视为死了。 */
+    private fun processAlive(ctx: Context, pkg: String): Boolean {
+        // root / shizuku pidof
+        if (Privilege.bestChannel(ctx) != Privilege.Channel.NONE) {
+            val out = Privilege.execShell(ctx, "pidof", pkg) ?: ""
+            if (out.isNotBlank() && !out.contains("error", ignoreCase = true)) return true
         }
+        // runningAppProcesses（API ≤ 30 可看其他进程；31+ 只能看本应用，查不到就返回 false）
+        if (android.os.Build.VERSION.SDK_INT <= 30) {
+            return try {
+                val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                am.runningAppProcesses?.any {
+                    it.processName == pkg || it.processName.startsWith("$pkg:")
+                } == true
+            } catch (t: Throwable) { false }
+        }
+        return false
     }
 
     // 兼容旧接口：纯被动模式下不再用定时巡检，保留空实现避免其他调用点崩溃
