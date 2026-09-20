@@ -221,6 +221,9 @@
     <string name="notif_hidden_toast">已隐藏 %1$s 的该渠道通知</string>
     <string name="notif_set_level_title">调整 %1$s 的渠道级别</string>
     <string name="notif_level_saved">已设置为 %1$s</string>
+    <string name="notif_clear_all">清除全部历史通知</string>
+    <string name="notif_clear_all_confirm">确定要删除全部历史通知吗？</string>
+    <string name="notif_clear_all_done">已清空</string>
     <string name="cd_app_icon">应用图标</string>
     <string name="app_state_foreground">前台使用中</string>
     <string name="app_state_running">运行中</string>

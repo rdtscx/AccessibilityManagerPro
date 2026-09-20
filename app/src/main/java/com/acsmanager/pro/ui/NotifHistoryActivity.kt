@@ -43,6 +43,18 @@ class NotifHistoryActivity : AppCompatActivity() {
         }
         binding.recycler.layoutManager = LinearLayoutManager(this)
         binding.recycler.adapter = adapter
+        // 清除全部：弹确认，确认后清空历史并刷新
+        binding.btnClearAll.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setMessage(R.string.notif_clear_all_confirm)
+                .setPositiveButton(R.string.ok) { _, _ ->
+                    Prefs.clearNotifHistoryFull(this)
+                    Toast.makeText(this, R.string.notif_clear_all_done, Toast.LENGTH_SHORT).show()
+                    reload()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        }
         reload()
     }
 
