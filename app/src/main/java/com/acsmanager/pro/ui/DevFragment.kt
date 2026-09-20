@@ -33,8 +33,22 @@ class DevFragment : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        _binding = FragmentDevBinding.inflate(inflater, container, false)
-        return binding.root
+        return try {
+            _binding = FragmentDevBinding.inflate(inflater, container, false)
+            binding.root
+        } catch (t: Throwable) {
+            android.widget.Toast.makeText(
+                requireContext(),
+                "开发者页面加载失败: ${t.message}",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            android.widget.FrameLayout(requireContext()).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {

@@ -1,9 +1,6 @@
 package com.acsmanager.pro.ui.adapter
 
-import android.os.Handler
-import android.os.Looper
-import android.view.LayoutInflater
-import android.view.ViewGroup
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.acsmanager.pro.R
@@ -19,6 +16,7 @@ import java.util.Locale
 
 /**
  * 开发者选项映射列表适配器：布尔项用开关、数值项用滑杆，直写 Settings 并永久生效。
+ * 用标准 Android 控件（Switch + SeekBar），避免 Material Slider 在部分设备上的兼容问题。
  */
 class DevOptionAdapter : RecyclerView.Adapter<DevOptionAdapter.Holder>() {
 
@@ -35,12 +33,17 @@ class DevOptionAdapter : RecyclerView.Adapter<DevOptionAdapter.Holder>() {
                 val o = option ?: return@setOnCheckedChangeListener
                 applyBool(o, checked)
             }
-            binding.slider.addOnChangeListener { _, value, fromUser ->
-                if (!fromUser) return@addOnChangeListener
-                val o = option ?: return@addOnChangeListener
-                binding.tvValue.text = String.format(Locale.US, "%.1f", value)
-                applyFloat(o, value)
-            }
+            binding.slider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    val o = option ?: return
+                    val v = progress / 2f // 0~20 → 0.0~10.0，步进 0.5
+                    binding.tvValue.text = String.format(Locale.US, "%.1f", v)
+                    applyFloat(o, v)
+                }
+                override fun onStartTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {}
+            })
         }
 
         private fun applyBool(o: DevOptions.Option, value: Boolean) {
@@ -91,8 +94,8 @@ class DevOptionAdapter : RecyclerView.Adapter<DevOptionAdapter.Holder>() {
                 binding.tvDesc.text = ctx.getString(o.descRes)
 
                 if (o.type == DevOptions.Type.BOOL) {
-                    binding.rowSwitch.visibility = ViewGroup.VISIBLE
-                    binding.slider.visibility = ViewGroup.GONE
+                    binding.rowSwitch.visibility = android.view.View.VISIBLE
+                    binding.slider.visibility = android.view.View.GONE
                     val v = DevOptions.readBool(ctx, o)
                     binding.tvValue.text = ctx.getString(if (v) R.string.dev_on else R.string.dev_off)
                     binding.switchValue.setOnCheckedChangeListener(null)
@@ -102,13 +105,11 @@ class DevOptionAdapter : RecyclerView.Adapter<DevOptionAdapter.Holder>() {
                         applyBool(oo, checked)
                     }
                 } else {
-                    binding.rowSwitch.visibility = ViewGroup.GONE
-                    binding.slider.visibility = ViewGroup.VISIBLE
-                    val v = DevOptions.readFloat(ctx, o)
-                    binding.slider.valueFrom = 0f
-                    binding.slider.valueTo = 10f
-                    binding.slider.stepSize = 0.5f
-                    binding.slider.value = v.coerceIn(0f, 10f)
+                    binding.rowSwitch.visibility = android.view.View.GONE
+                    binding.slider.visibility = android.view.View.VISIBLE
+                    val v = DevOptions.readFloat(ctx, o).coerceIn(0f, 10f)
+                    binding.slider.max = 20
+                    binding.slider.progress = (v * 2).toInt() // 0~10 → 0~20
                     binding.tvValue.text = String.format(Locale.US, "%.1f", v)
                 }
                 binding.tvStatus.text = when (o.type) {
@@ -129,8 +130,8 @@ class DevOptionAdapter : RecyclerView.Adapter<DevOptionAdapter.Holder>() {
     private fun channelLabel(ctx: android.content.Context, ch: Privilege.Channel): String =
         ctx.getString(ch.labelRes)
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder =
-        Holder(ItemDevOptionBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+    override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): Holder =
+        Holder(ItemDevOptionBinding.inflate(android.view.LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         holder.bind(items[position])
