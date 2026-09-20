@@ -202,6 +202,13 @@
     <string name="usage_open_failed">无法打开使用情况访问设置</string>
     <string name="action_relaunch">立即拉起</string>
     <string name="action_protect">加入保活</string>
+    <string name="action_launch">启动</string>
+    <string name="svclist_title">服务列表</string>
+    <string name="svclist_empty">未发现可启动组件</string>
+    <string name="svclist_section_activity">界面（Activity）</string>
+    <string name="svclist_section_service">服务（Service）</string>
+    <string name="svclist_not_protected">未保活</string>
+    <string name="svclist_protected">已保活</string>
     <string name="cd_app_icon">应用图标</string>
     <string name="app_state_foreground">前台使用中</string>
     <string name="app_state_running">运行中</string>

@@ -186,6 +186,23 @@ object Prefs {
 
     fun isKeepAlive(ctx: Context, pkg: String): Boolean = pkg in keepAliveApps(ctx)
 
+    // ---------- 按组件粒度的保活（勾选单个 Service/Activity） ----------
+
+    /** 保活的组件集合，元素为 ComponentName.flattenToString()（"pkg/cls"）。 */
+    fun keepAliveComponents(ctx: Context): Set<String> =
+        get(ctx).getStringSet("keepalive_components", emptySet()) ?: emptySet()
+
+    fun setKeepAliveComponents(ctx: Context, v: Set<String>) {
+        get(ctx).edit().putStringSet("keepalive_components", v.toSet()).apply()
+    }
+
+    fun isComponentKept(ctx: Context, componentFlat: String): Boolean =
+        componentFlat in keepAliveComponents(ctx)
+
+    /** 某包下被勾选保活的组件集合。 */
+    fun componentsForPackage(ctx: Context, pkg: String): Set<String> =
+        keepAliveComponents(ctx).filter { it.startsWith("$pkg/") }.toSet()
+
     /** 保活巡检间隔（毫秒）。 */
     fun keepAliveIntervalMs(ctx: Context): Long =
         get(ctx).getLong("keepalive_interval", 30_000L)

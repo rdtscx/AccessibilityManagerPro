@@ -142,10 +142,13 @@ class KeepAliveFragment : Fragment() {
         val protected = Prefs.keepAliveApps(requireContext())
         val q = query.lowercase()
         val filtered = allApps.filter { app ->
-            (filter == FILTER_ALL ||
-                (filter == FILTER_USER && !app.isSystem) ||
-                (filter == FILTER_SYSTEM && app.isSystem) ||
-                (filter == FILTER_PROTECTED && app.packageName in protected)) &&
+            // 主列表只保留可直接打开（有 LaunchIntent）的应用；
+            // 无 LaunchIntent 的组件（库、纯服务）请到二级服务列表里勾选。
+            app.hasLauncher &&
+                (filter == FILTER_ALL ||
+                    (filter == FILTER_USER && !app.isSystem) ||
+                    (filter == FILTER_SYSTEM && app.isSystem) ||
+                    (filter == FILTER_PROTECTED && app.packageName in protected)) &&
                 (q.isEmpty() || app.label.lowercase().contains(q) ||
                     app.packageName.lowercase().contains(q))
         }

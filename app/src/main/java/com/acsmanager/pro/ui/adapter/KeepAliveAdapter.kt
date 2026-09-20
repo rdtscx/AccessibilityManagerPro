@@ -31,6 +31,15 @@ class KeepAliveAdapter(
         private var pkg: String? = null
 
         init {
+            // 点击条目（卡片任意位置，除按钮/勾选框外）：进入二级服务列表
+            binding.root.setOnClickListener {
+                val p = pkg ?: return@setOnClickListener
+                val ctx = binding.root.context
+                val intent = android.content.Intent(ctx,
+                    com.acsmanager.pro.ui.ServiceListActivity::class.java)
+                intent.putExtra(com.acsmanager.pro.ui.ServiceListActivity.EXTRA_PACKAGE, p)
+                ctx.startActivity(intent)
+            }
             binding.btnRelaunch.setOnClickListener {
                 val p = pkg ?: return@setOnClickListener
                 val ok = KeepAliveEngine.manualRelaunch(binding.root.context, p)
