@@ -86,33 +86,42 @@ class DevOptionAdapter : RecyclerView.Adapter<DevOptionAdapter.Holder>() {
         fun bind(o: DevOptions.Option) {
             option = o
             val ctx = binding.root.context
-            binding.tvTitle.text = ctx.getString(o.labelRes)
-            binding.tvDesc.text = ctx.getString(o.descRes)
+            try {
+                binding.tvTitle.text = ctx.getString(o.labelRes)
+                binding.tvDesc.text = ctx.getString(o.descRes)
 
-            if (o.type == DevOptions.Type.BOOL) {
-                binding.rowSwitch.visibility = ViewGroup.VISIBLE
-                binding.slider.visibility = ViewGroup.GONE
-                binding.tvValue.text = ctx.getString(
-                    if (DevOptions.readBool(ctx, o)) R.string.dev_on else R.string.dev_off
-                )
-                binding.switchValue.isChecked = DevOptions.readBool(ctx, o)
-            } else {
-                binding.rowSwitch.visibility = ViewGroup.GONE
-                binding.slider.visibility = ViewGroup.VISIBLE
-                val v = DevOptions.readFloat(ctx, o)
-                binding.slider.valueFrom = 0f
-                binding.slider.valueTo = 10f
-                binding.slider.stepSize = 0.5f
-                binding.slider.value = v.coerceIn(0f, 10f)
-                binding.tvValue.text = String.format(Locale.US, "%.1f", v)
-            }
-            binding.tvStatus.text = when (o.type) {
-                DevOptions.Type.BOOL ->
-                    ctx.getString(
-                        if (DevOptions.readBool(ctx, o)) R.string.dev_on else R.string.dev_off
-                    )
-                DevOptions.Type.FLOAT ->
-                    ctx.getString(R.string.dev_current, String.format(Locale.US, "%.1f", DevOptions.readFloat(ctx, o)))
+                if (o.type == DevOptions.Type.BOOL) {
+                    binding.rowSwitch.visibility = ViewGroup.VISIBLE
+                    binding.slider.visibility = ViewGroup.GONE
+                    val v = DevOptions.readBool(ctx, o)
+                    binding.tvValue.text = ctx.getString(if (v) R.string.dev_on else R.string.dev_off)
+                    binding.switchValue.setOnCheckedChangeListener(null)
+                    binding.switchValue.isChecked = v
+                    binding.switchValue.setOnCheckedChangeListener { _, checked ->
+                        val oo = option ?: return@setOnCheckedChangeListener
+                        applyBool(oo, checked)
+                    }
+                } else {
+                    binding.rowSwitch.visibility = ViewGroup.GONE
+                    binding.slider.visibility = ViewGroup.VISIBLE
+                    val v = DevOptions.readFloat(ctx, o)
+                    binding.slider.valueFrom = 0f
+                    binding.slider.valueTo = 10f
+                    binding.slider.stepSize = 0.5f
+                    binding.slider.value = v.coerceIn(0f, 10f)
+                    binding.tvValue.text = String.format(Locale.US, "%.1f", v)
+                }
+                binding.tvStatus.text = when (o.type) {
+                    DevOptions.Type.BOOL ->
+                        ctx.getString(
+                            if (DevOptions.readBool(ctx, o)) R.string.dev_on else R.string.dev_off
+                        )
+                    DevOptions.Type.FLOAT ->
+                        ctx.getString(R.string.dev_current, String.format(Locale.US, "%.1f", DevOptions.readFloat(ctx, o)))
+                }
+            } catch (t: Throwable) {
+                binding.tvTitle.text = ctx.getString(o.labelRes)
+                binding.tvStatus.text = "读取失败: ${t.message}"
             }
         }
     }

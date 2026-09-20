@@ -39,13 +39,20 @@ class DevFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        try {
+            binding.recycler.layoutManager = LinearLayoutManager(requireContext())
+            binding.recycler.adapter = adapter
 
-        binding.recycler.layoutManager = LinearLayoutManager(requireContext())
-        binding.recycler.adapter = adapter
-
-        binding.btnPresetFast.setOnClickListener { applyPreset(DevOptions.Preset.FAST) }
-        binding.btnPresetExtreme.setOnClickListener { applyPreset(DevOptions.Preset.EXTREME) }
-        binding.btnPresetDefault.setOnClickListener { applyPreset(DevOptions.Preset.DEFAULT) }
+            binding.btnPresetFast.setOnClickListener { applyPreset(DevOptions.Preset.FAST) }
+            binding.btnPresetExtreme.setOnClickListener { applyPreset(DevOptions.Preset.EXTREME) }
+            binding.btnPresetDefault.setOnClickListener { applyPreset(DevOptions.Preset.DEFAULT) }
+        } catch (t: Throwable) {
+            android.widget.Toast.makeText(
+                requireContext(),
+                "开发者页面初始化失败: ${t.message}",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     private fun applyPreset(preset: DevOptions.Preset) {
