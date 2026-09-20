@@ -143,10 +143,17 @@ object PermGroups {
             (!t.contains("error", ignoreCase = true) && !t.startsWith("Exception"))
     }
 
-    /** 生成 ADB 手动执行命令（用于无 Root/Shizuku 时的降级指引）。 */
+    /** 生成单条合并的 ADB 命令（所有 grant 用 && 连接，一条跑完即可）。 */
     fun adbCommand(pkg: String, permission: String, grant: Boolean): String {
         val action = if (grant) "grant" else "revoke"
-        return "adb shell pm $action $pkg $permission"
+        return "pm $action $pkg $permission"
+    }
+
+    /** 把多条 pm 命令合并成一条 adb shell "..." 命令，用户只需复制一次跑一次。 */
+    fun adbCommandCombined(pkg: String, permissions: List<String>, grant: Boolean): String {
+        val action = if (grant) "grant" else "revoke"
+        val inner = permissions.joinToString(" && ") { "pm $action $pkg $it" }
+        return "adb shell \"$inner\""
     }
 
     /** 权限名去前缀后的短名，用于行内展示。 */

@@ -113,7 +113,7 @@
     <string name="guide_shizuku_grant">授权</string>
     <string name="guide_shizuku_ok">已连接并授权</string>
     <string name="guide_adb">ADB 通道</string>
-    <string name="guide_adb_desc">电脑执行 adb 命令授予 WRITE_SECURE_SETTINGS 后，应用可直接写开关。无线调试请配合配对码。</string>
+    <string name="guide_adb_desc">电脑上跑下面这一条命令即可，跑完自动授权并开启无障碍，永久生效，不用再去设置里手动点。</string>
     <string name="guide_adb_cmd">复制命令</string>
     <string name="guide_adb_copy_done">已复制</string>
     <string name="guide_adb_ok">已检测到授权</string>
@@ -356,9 +356,9 @@
     <string name="permmgr_banner_shell">通道：%1$s —— 可系统级直接修改权限。</string>
     <string name="permdetail_title">权限详情</string>
     <string name="permdetail_banner_shell">Root / Shizuku 通道已启用：开关直接系统级修改，立即生效。</string>
-    <string name="permdetail_banner_none">无 Root / Shizuku 通道：开关不可用，请用 ADB 执行（可一键复制全部命令）。</string>
-    <string name="permdetail_copy_adb">复制全部 ADB 命令</string>
-    <string name="permdetail_copied">已复制全部 ADB 命令</string>
+    <string name="permdetail_banner_none">无 Root / Shizuku：点下方按钮复制一条合并命令，到电脑 adb 跑一次即可系统级改权。</string>
+    <string name="permdetail_copy_adb">复制一条 ADB 命令</string>
+    <string name="permdetail_copied">已复制，到电脑 adb 跑这一条即可</string>
     <string name="permdetail_toggle_ok">已修改：%1$s</string>
     <string name="permdetail_toggle_fail">修改失败：%1$s（需 Root / Shizuku）</string>
     <string name="permdetail_granted">已授予</string>

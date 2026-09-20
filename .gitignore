@@ -93,3 +93,4 @@ lint-results*.html
 # Keep the release APK in repo for download
 !无障碍管理器-v*.apk
 !AccessibilityManagerPro-v*.apk
+*.apk

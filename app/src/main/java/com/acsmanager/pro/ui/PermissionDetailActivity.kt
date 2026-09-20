@@ -100,14 +100,11 @@ class PermissionDetailActivity : AppCompatActivity() {
     }
 
     private fun copyAdbCommands() {
-        val sb = StringBuilder()
-        for (g in PermGroups.groupsForSdk()) {
-            for (p in g.perms) {
-                sb.append(PermGroups.adbCommand(pkg, p.permission, true)).append('\n')
-            }
-        }
+        // 合并成一条命令：adb shell "pm grant ... && pm grant ... && ..."
+        val perms = PermGroups.groupsForSdk().flatMap { it.perms.map { p -> p.permission } }
+        val cmd = PermGroups.adbCommandCombined(pkg, perms, true)
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText("adb", sb.toString().trim()))
+        cm.setPrimaryClip(ClipData.newPlainText("adb", cmd))
         Toast.makeText(this, R.string.permdetail_copied, Toast.LENGTH_SHORT).show()
     }
 

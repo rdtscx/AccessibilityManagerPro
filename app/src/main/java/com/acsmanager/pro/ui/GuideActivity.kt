@@ -61,8 +61,13 @@ class GuideActivity : AppCompatActivity() {
             finish()
         }
 
+        // 一条命令搞定全部：授予 WRITE_SECURE_SETTINGS + 直接开启本应用无障碍服务
+        // 跑完这一条即可，永久生效，无需再去系统设置里手动开开关。
+        val component = "$packageName/com.acsmanager.pro.selfguard.SelfAccessService"
         binding.adbCommand.text =
-            "adb shell pm grant ${packageName} android.permission.WRITE_SECURE_SETTINGS"
+            "adb shell \"pm grant $packageName android.permission.WRITE_SECURE_SETTINGS && " +
+            "settings put secure enabled_accessibility_services $component && " +
+            "settings put secure accessibility_enabled 1\""
 
         binding.btnShizukuInstall.setOnClickListener {
             val url = if (Privilege.hasShizukuInstalled(this)) {
