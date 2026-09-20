@@ -137,6 +137,12 @@ class GuideActivity : AppCompatActivity() {
         } catch (t: Throwable) {
         }
         detect()
+        // 已授权任一通道：直接标记完成并返回首页，不再启动 2 秒轮询
+        if (isAnyChannelReady()) {
+            Prefs.setFirstGuideDone(this, true)
+            finish()
+            return
+        }
         handler.removeCallbacks(detectRunnable)
         handler.postDelayed(detectRunnable, 2000L)
     }

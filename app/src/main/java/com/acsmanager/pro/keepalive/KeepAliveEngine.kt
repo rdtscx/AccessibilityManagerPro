@@ -338,20 +338,42 @@ object KeepAliveEngine {
         val prevForeground = lastForegroundPkg
         var launched = false
         try {
+            val channel = Privilege.bestChannel(ctx)
             if (target.component != null) {
-                // 单组件保活（通常是 Service）：普通 startForegroundService 需要前台或后台启动权限，
-                // 走 Root/Shizuku shell 用 am start-foreground-service 拉起。
+                // 单组件（Service）保活：
+                //  - Root / Shizuku 通道：用 shell `am start-foreground-service` 直接拉起 service；
+                //  - ADB(WRITE_SECURE_SETTINGS) / 无障碍通道：shell 不可用，
+                //    改用无障碍服务（系统豁免后台启动限制）拉起该包主界面，让 app 自起 service。
                 val flat = "${target.pkg}/${target.component}"
-                Privilege.execShell(ctx, "am", "start-foreground-service", "-n", flat)
-                    ?: Privilege.execShell(ctx, "am", "startservice", "-n", flat)
-                launched = true
+                if (channel == Privilege.Channel.ROOT || channel == Privilege.Channel.SHIZUKU) {
+                    Privilege.execShell(ctx, "am", "start-foreground-service", "-n", flat)
+                        ?: Privilege.execShell(ctx, "am", "startservice", "-n", flat)
+                    launched = true
+                } else {
+                    val svc = service
+                    val pkgIntent = AppsRepository.launchIntent(ctx, target.pkg)
+                    if (svc != null && pkgIntent != null) {
+                        pkgIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                        svc.startActivity(pkgIntent)
+                        launched = true
+                    } else if (pkgIntent != null) {
+                        pkgIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        ctx.startActivity(pkgIntent)
+                        launched = true
+                    }
+                }
             } else {
-                // 整包保活：用 LaunchIntent 拉起主 Activity
+                // 整包保活：优先用无障碍服务 Context 拉起（系统豁免后台 Activity 启动限制）；
+                // 无障碍服务未运行时回退普通 startActivity。
                 val intent = AppsRepository.launchIntent(ctx, target.pkg) ?: return
                 intent.addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
                 )
-                ctx.startActivity(intent)
+                val svc = service
+                when {
+                    svc != null -> svc.startActivity(intent)
+                    else -> ctx.startActivity(intent)
+                }
                 launched = true
             }
             if (!launched) {
@@ -370,7 +392,7 @@ object KeepAliveEngine {
                 target.pkg,
                 ctx.getString(R.string.keepalive_log_relaunched, target.relaunchCount)
             )
-            Log.i(TAG, "silently relaunched ${target.pkg}${target.component?.let { "/$it" } ?: ""}")
+            Log.i(TAG, "silently relaunched ${target.pkg}${target.component?.let { "/$it" } ?: ""} via $channel")
 
             // 实验选项：拉起时显示 Toast 提示（默认关闭；自定义文案优先）
             if (Prefs.relaunchToastEnabled(ctx)) {
