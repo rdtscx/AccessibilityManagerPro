@@ -454,12 +454,18 @@ object KeepAliveEngine {
         }
     }
 
-    /** 手动测试拉起（实验页 / 保活列表单点触发）。 */
+    /**
+     * 手动测试拉起（实验页 / 保活列表单点触发）。
+     * 与正式保活的区别：拉起后等待用户配置的返回延迟，但**不切回上一个软件**，
+     * 直接停在目标应用，方便用户验证拉起效果。
+     */
     fun manualRelaunch(ctx: Context, pkg: String): Boolean {
         val intent = AppsRepository.launchIntent(ctx, pkg) ?: return false
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
         return try {
-            ctx.startActivity(intent)
+            // 优先用无障碍服务 Context 拉起（与正式保活一致，后台启动更可靠）
+            val svc = service
+            if (svc != null) svc.startActivity(intent) else ctx.startActivity(intent)
             EventLog.record(ctx, EventLog.TYPE_SERVICE, pkg, "manual relaunch")
             true
         } catch (t: Throwable) {

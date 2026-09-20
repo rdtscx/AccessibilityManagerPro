@@ -3,6 +3,8 @@ package com.acsmanager.pro.ui
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -36,6 +38,10 @@ class NotifFragment : Fragment() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val adapter = NotifAdapter()
 
+    private var allApps: List<AppEntry> = emptyList()
+    private var filter = FILTER_ALL
+    private var query = ""
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -62,17 +68,54 @@ class NotifFragment : Fragment() {
             loadApps()
             Toast.makeText(requireContext(), R.string.notif_reset_done, Toast.LENGTH_SHORT).show()
         }
+
+        // 搜索
+        binding.etSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {
+                query = s?.toString()?.trim() ?: ""
+                applyFilter()
+            }
+            override fun afterTextChanged(s: Editable?) = Unit
+        })
+
+        // 筛选 chips
+        binding.chipGroup.setOnCheckedStateChangeListener { _, _ ->
+            filter = when (binding.chipGroup.checkedChipId) {
+                R.id.chip_user -> FILTER_USER
+                R.id.chip_system -> FILTER_SYSTEM
+                R.id.chip_set -> FILTER_SET
+                else -> FILTER_ALL
+            }
+            applyFilter()
+        }
     }
 
     private fun loadApps() {
         scope.launch {
             val apps = withContext(Dispatchers.IO) { AppsRepository.scan(requireContext()) }
-            adapter.submit(apps)
+            allApps = apps
+            applyFilter()
             binding.tvNotifCount.text = getString(
                 R.string.notif_count,
                 Prefs.notifLevels(requireContext()).size
             )
         }
+    }
+
+    /** 按搜索词 + 筛选 chip 过滤列表（与保活页一致）。 */
+    private fun applyFilter() {
+        val setPkgs = Prefs.notifLevels(requireContext()).keys
+        val q = query.lowercase()
+        val filtered = allApps.filter { app ->
+            (filter == FILTER_ALL ||
+                (filter == FILTER_USER && !app.isSystem) ||
+                (filter == FILTER_SYSTEM && app.isSystem) ||
+                (filter == FILTER_SET && app.packageName in setPkgs)) &&
+                (q.isEmpty() || app.label.lowercase().contains(q) ||
+                    app.packageName.lowercase().contains(q))
+        }
+        adapter.submit(filtered)
     }
 
     override fun onResume() {
@@ -117,5 +160,12 @@ class NotifFragment : Fragment() {
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()
+    }
+
+    companion object {
+        private const val FILTER_ALL = 0
+        private const val FILTER_USER = 1
+        private const val FILTER_SYSTEM = 2
+        private const val FILTER_SET = 3
     }
 }

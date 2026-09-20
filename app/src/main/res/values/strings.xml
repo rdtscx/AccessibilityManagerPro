@@ -213,6 +213,7 @@
     <string name="keepalive_delay_desc">被保活应用被拉起后，等待多久再切回上一个软件（默认 100ms，50~2000ms）</string>
     <string name="keepalive_delay_value_format">%d ms</string>
     <string name="keepalive_status_kept">已保活</string>
+    <string name="notif_filter_set">已设置</string>
     <string name="cd_app_icon">应用图标</string>
     <string name="app_state_foreground">前台使用中</string>
     <string name="app_state_running">运行中</string>
