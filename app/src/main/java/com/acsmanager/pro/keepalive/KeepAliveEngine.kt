@@ -253,10 +253,9 @@ object KeepAliveEngine {
             } catch (t: Throwable) {
                 Log.w(TAG, "usage query failed", t)
             }
-            if (lastResume > lastStop) return true
-            if (lastResume > 0L || lastStop > 0L) {
-                return false // 最近有活动且最后是停止 → 已不在前台运行
-            }
+            // 只确认"在前台"才放行；不因为有 STOP 事件就判死——后台有 service 的 app
+            // 可能很久没有 RESUMED 事件，usage 判断会误杀。继续往下走让 pidof/进程列表兜底。
+            if (lastResume > lastStop && lastResume > 0L) return true
         }
 
         // 4. 进程列表兜底（API ≤ 30；31+ 仅返回本应用进程，无意义但保留）
