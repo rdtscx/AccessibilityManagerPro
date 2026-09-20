@@ -407,6 +407,8 @@ class SelfGuardService : Service() {
 
             // 恢复成功通知
             if (successList.isNotEmpty()) {
+                // 每个成功拉起的无障碍服务都计入累计拉起次数
+                repeat(successList.size) { Prefs.bumpTotalPull(this@SelfGuardService) }
                 notifyRestored(successList.size)
             }
 
@@ -461,6 +463,8 @@ class SelfGuardService : Service() {
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        // 通知第二行动态显示累计拉起次数（无障碍 + 应用保活合计）
+        val pullText = "已拉起 ${Prefs.totalPullCount(this)} 次"
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
         } else {
@@ -470,7 +474,7 @@ class SelfGuardService : Service() {
         return builder
             .setSmallIcon(R.drawable.ic_keepalive)
             .setContentTitle(getString(R.string.self_guard_notif_title))
-            .setContentText(contentText ?: getString(R.string.self_guard_notif_text))
+            .setContentText(contentText ?: pullText)
             .setContentIntent(openPi)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -508,11 +512,12 @@ class SelfGuardService : Service() {
         nm.notify(NOTIF_ID + 1, n)
     }
 
-    /** 恢复成功后更新前台通知文字，让用户感知到保活动作。 */
+    /** 拉起成功后更新前台通知文字为最新累计次数。 */
     private fun notifyRestored(count: Int) {
         try {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.notify(NOTIF_ID, buildNotification(getString(R.string.self_guard_restored_text, count)))
+            // 不传 contentText，让 buildNotification 用默认的"已拉起 X 次"
+            nm.notify(NOTIF_ID, buildNotification())
         } catch (t: Throwable) {
             Log.w(TAG, "notifyRestored failed", t)
         }

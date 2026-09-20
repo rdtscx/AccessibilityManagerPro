@@ -6,6 +6,7 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
@@ -318,6 +319,9 @@ object KeepAliveEngine {
             target.lastRelaunchMs = SystemClock.elapsedRealtime()
             target.relaunchCount++
             Prefs.bumpRelaunch(ctx)
+            // 累计拉起次数 +1（无障碍 + 应用保活合计，通知里动态显示）
+            Prefs.bumpTotalPull(ctx)
+            refreshSelfGuardNotif(ctx)
             EventLog.record(
                 ctx,
                 EventLog.TYPE_RESTORED,
@@ -405,4 +409,36 @@ object KeepAliveEngine {
     fun isTargetAlive(ctx: Context, pkg: String): Boolean = isAlive(ctx, pkg)
 
     fun protectedCount(): Int = targets.size
+
+    /**
+     * 应用保活拉起后，刷新自监控前台通知上的"已拉起 X 次"数字。
+     * 直接复用 SelfGuardService 的通知 channel / ID，覆盖同一条通知，不另开通知。
+     */
+    private fun refreshSelfGuardNotif(ctx: Context) {
+        try {
+            val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            // 自监控未运行时 activeNotifications 里没有 ID=102 的通知，不重建
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val running = nm.activeNotifications.any { it.id == 102 }
+                if (!running) return
+            }
+            val ch = "self_guard"
+            val text = "已拉起 ${Prefs.totalPullCount(ctx)} 次"
+            val n = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                android.app.Notification.Builder(ctx, ch)
+            } else {
+                @Suppress("DEPRECATION")
+                android.app.Notification.Builder(ctx)
+            }
+                .setSmallIcon(ctx.applicationInfo.icon)
+                .setContentTitle(ctx.getString(com.acsmanager.pro.R.string.self_guard_notif_title))
+                .setContentText(text)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .build()
+            nm.notify(102, n)
+        } catch (t: Throwable) {
+            // 静默失败，不影响保活主流程
+        }
+    }
 }
