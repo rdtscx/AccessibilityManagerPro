@@ -19,7 +19,7 @@ object DevOptions {
 
     private const val TAG = "AcsDevOptions"
 
-    enum class Table { GLOBAL, SYSTEM }
+    enum class Table { GLOBAL, SYSTEM, SECURE }
 
     enum class Type { FLOAT, BOOL }
 
@@ -56,7 +56,31 @@ object DevOptions {
         Option("strict_mode", Table.GLOBAL, Type.BOOL,
             R.string.dev_strict_mode, R.string.dev_strict_mode_desc, defBool = false),
         Option("show_touches", Table.SYSTEM, Type.BOOL,
-            R.string.dev_show_touches, R.string.dev_show_touches_desc, defBool = false)
+            R.string.dev_show_touches, R.string.dev_show_touches_desc, defBool = false),
+        // 指针位置 / 布局边界 / GPU 呈现分析
+        Option("pointer_location", Table.SYSTEM, Type.BOOL,
+            R.string.dev_pointer_loc, R.string.dev_pointer_loc_desc, defBool = false),
+        Option("debug_layout", Table.GLOBAL, Type.BOOL,
+            R.string.dev_debug_layout, R.string.dev_debug_layout_desc, defBool = false),
+        Option("profile_hwui", Table.GLOBAL, Type.BOOL,
+            R.string.dev_profile_hwui, R.string.dev_profile_hwui_desc, defBool = false),
+        // USB 调试 / 充电保持唤醒
+        Option("adb_enabled", Table.GLOBAL, Type.BOOL,
+            R.string.dev_adb_enabled, R.string.dev_adb_enabled_desc, defBool = true),
+        Option("stay_on_while_plugged_in", Table.GLOBAL, Type.BOOL,
+            R.string.dev_stay_on, R.string.dev_stay_on_desc, defBool = false),
+        // 模拟位置 / 自动旋转
+        Option("mock_location", Table.SECURE, Type.BOOL,
+            R.string.dev_mock_loc, R.string.dev_mock_loc_desc, defBool = false),
+        Option("accelerometer_rotation", Table.SYSTEM, Type.BOOL,
+            R.string.dev_auto_rotate, R.string.dev_auto_rotate_desc, defBool = true),
+        // 指针速度 / 屏幕超时（秒）/ 字体缩放
+        Option("pointer_speed", Table.SYSTEM, Type.FLOAT,
+            R.string.dev_pointer_speed, R.string.dev_pointer_speed_desc, defFloat = 0.5f),
+        Option("screen_off_timeout", Table.SYSTEM, Type.FLOAT,
+            R.string.dev_screen_timeout, R.string.dev_screen_timeout_desc, defFloat = 30f),
+        Option("font_scale", Table.SYSTEM, Type.FLOAT,
+            R.string.dev_font_scale, R.string.dev_font_scale_desc, defFloat = 1.0f)
     )
 
     // ---------- 读取 ----------
@@ -65,6 +89,7 @@ object DevOptions {
         when (o.table) {
             Table.GLOBAL -> Settings.Global.getFloat(ctx.contentResolver, o.key)
             Table.SYSTEM -> Settings.System.getFloat(ctx.contentResolver, o.key)
+            Table.SECURE -> Settings.Secure.getFloat(ctx.contentResolver, o.key)
         }
     } catch (t: Throwable) {
         o.defFloat
@@ -74,6 +99,7 @@ object DevOptions {
         when (o.table) {
             Table.GLOBAL -> Settings.Global.getInt(ctx.contentResolver, o.key) != 0
             Table.SYSTEM -> Settings.System.getInt(ctx.contentResolver, o.key) != 0
+            Table.SECURE -> Settings.Secure.getInt(ctx.contentResolver, o.key) != 0
         }
     } catch (t: Throwable) {
         o.defBool
@@ -87,6 +113,7 @@ object DevOptions {
             when (o.table) {
                 Table.GLOBAL -> Settings.Global.putFloat(ctx.contentResolver, o.key, value)
                 Table.SYSTEM -> Settings.System.putFloat(ctx.contentResolver, o.key, value)
+                Table.SECURE -> Settings.Secure.putFloat(ctx.contentResolver, o.key, value)
             }
         } catch (t: Throwable) {
             Log.w(TAG, "direct float write failed: ${o.key}", t)
@@ -105,6 +132,7 @@ object DevOptions {
             when (o.table) {
                 Table.GLOBAL -> Settings.Global.putInt(ctx.contentResolver, o.key, iv)
                 Table.SYSTEM -> Settings.System.putInt(ctx.contentResolver, o.key, iv)
+                Table.SECURE -> Settings.Secure.putInt(ctx.contentResolver, o.key, iv)
             }
         } catch (t: Throwable) {
             Log.w(TAG, "direct bool write failed: ${o.key}", t)
@@ -117,7 +145,11 @@ object DevOptions {
     }
 
     private fun shellWrite(ctx: Context, o: Option, value: String): WriteResult {
-        val table = if (o.table == Table.GLOBAL) "global" else "system"
+        val table = when (o.table) {
+            Table.GLOBAL -> "global"
+            Table.SYSTEM -> "system"
+            Table.SECURE -> "secure"
+        }
         // Root / Shizuku 统一走 execShell（参数经 shell 转义；value 为数字，安全）
         val ch = Privilege.bestChannel(ctx)
         if (ch != Privilege.Channel.ROOT && ch != Privilege.Channel.SHIZUKU) {
