@@ -343,57 +343,40 @@ object KeepAliveEngine {
 
     // ---------- 拉起 + 返回上一应用 ----------
 
+    /**
+     * 统一用无障碍服务 Context 拉起（三授权渠道下都走无障碍能力，最稳）。
+     * @return true 如果 startActivity 没抛异常
+     */
+    private fun startActivityViaAccessibility(ctx: Context, intent: Intent): Boolean {
+        return try {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            val svc = service
+            if (svc != null) svc.startActivity(intent) else ctx.startActivity(intent)
+            true
+        } catch (t: Throwable) {
+            Log.w(TAG, "startActivity failed", t)
+            false
+        }
+    }
+
     private fun relaunch(ctx: Context, target: Target) {
-        // 记录"用户上一个软件"：拉起前的前台应用（返回方案 prev 用）
+        // 记录"用户上一个软件"：拉起前的前台应用（返回 prev 用）
         val prevForeground = lastForegroundPkg
-        var launched = false
         try {
-            val channel = Privilege.bestChannel(ctx)
-            if (target.component != null) {
-                // 单组件（Service）保活：
-                //  - Root / Shizuku 通道：用 shell `am start-foreground-service` 直接拉起 service；
-                //  - ADB(WRITE_SECURE_SETTINGS) / 无障碍通道：shell 不可用，
-                //    改用无障碍服务（系统豁免后台启动限制）拉起该包主界面，让 app 自起 service。
-                val flat = "${target.pkg}/${target.component}"
-                if (channel == Privilege.Channel.ROOT || channel == Privilege.Channel.SHIZUKU) {
-                    Privilege.execShell(ctx, "am", "start-foreground-service", "-n", flat)
-                        ?: Privilege.execShell(ctx, "am", "startservice", "-n", flat)
-                    launched = true
-                } else {
-                    val svc = service
-                    val pkgIntent = AppsRepository.launchIntent(ctx, target.pkg)
-                    if (svc != null && pkgIntent != null) {
-                        pkgIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-                        svc.startActivity(pkgIntent)
-                        launched = true
-                    } else if (pkgIntent != null) {
-                        pkgIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        ctx.startActivity(pkgIntent)
-                        launched = true
-                    }
-                }
-            } else {
-                // 整包保活：优先用无障碍服务 Context 拉起（系统豁免后台 Activity 启动限制）；
-                // 无障碍服务未运行时回退普通 startActivity。
-                val intent = AppsRepository.launchIntent(ctx, target.pkg) ?: return
-                intent.addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-                )
-                val svc = service
-                when {
-                    svc != null -> svc.startActivity(intent)
-                    else -> ctx.startActivity(intent)
-                }
-                launched = true
+            // 三授权渠道下全部用无障碍能力拉起（不再走 root/shizuku shell）
+            val pkgIntent = AppsRepository.launchIntent(ctx, target.pkg)
+            if (pkgIntent == null) {
+                EventLog.record(ctx, EventLog.TYPE_WARN, target.pkg, "relaunch: no launch intent")
+                return
             }
-            if (!launched) {
-                EventLog.record(ctx, EventLog.TYPE_WARN, target.pkg, "relaunch: no launch path")
+            val ok = startActivityViaAccessibility(ctx, pkgIntent)
+            if (!ok) {
+                EventLog.record(ctx, EventLog.TYPE_WARN, target.pkg, "relaunch: startActivity threw")
                 return
             }
             target.lastRelaunchMs = SystemClock.elapsedRealtime()
             target.relaunchCount++
             Prefs.bumpRelaunch(ctx)
-            // 累计拉起次数 +1（无障碍 + 应用保活合计，通知里动态显示）
             Prefs.bumpTotalPull(ctx)
             refreshSelfGuardNotif(ctx)
             EventLog.record(
@@ -402,9 +385,9 @@ object KeepAliveEngine {
                 target.pkg,
                 ctx.getString(R.string.keepalive_log_relaunched, target.relaunchCount)
             )
-            Log.i(TAG, "silently relaunched ${target.pkg}${target.component?.let { "/$it" } ?: ""} via $channel")
+            Log.i(TAG, "silently relaunched ${target.pkg}")
 
-            // 实验选项：拉起时显示 Toast 提示（默认关闭；自定义文案优先）
+            // 实验选项：拉起时显示 Toast 提示（默认关闭）
             if (Prefs.relaunchToastEnabled(ctx)) {
                 val label = AppsRepository.labelOf(ctx, target.pkg) ?: target.pkg
                 val text = Prefs.relaunchToastText(ctx)?.takeIf { it.isNotBlank() }
@@ -415,8 +398,10 @@ object KeepAliveEngine {
                 }
             }
 
-            // 按用户配置的延迟后按"返回方案"处理（无感保活：拉起后立即切回用户上一个软件）
-            handleReturn(ctx, target.pkg, prevForeground)
+            // 启动判定：1s 后检查是否真的拉起到前台，没起来重试 1 次
+            handler.postDelayed({
+                verifyLaunch(ctx, target, prevForeground, retried = false)
+            }, 1_000L)
         } catch (t: Throwable) {
             Log.w(TAG, "relaunch ${target.pkg} failed", t)
             EventLog.record(ctx, EventLog.TYPE_WARN, target.pkg, "relaunch failed: ${t.message}")
@@ -424,43 +409,66 @@ object KeepAliveEngine {
     }
 
     /**
-     * 拉起后按用户配置的延迟（默认 100ms）按返回方案处理：
-     *  - prev：切回用户上一个软件（默认，无感保活）；
-     *  - stay：停留在目标软件；
-     *  - home：返回桌面。
+     * 启动判定：检查 lastForegroundPkg 是否等于目标包。
+     * 没起来 → 1s 后重试 1 次；再失败 → 计入监控二级页面（EventLog TYPE_WARN）。
      */
-    private fun handleReturn(ctx: Context, relaunchedPkg: String, prevForeground: String?) {
-        val mode = Prefs.keepAliveReturnMode(ctx)
-        if (mode == "stay") return
-        val delay = Prefs.keepAliveReturnDelayMs(ctx)
-        if (mode == "home") {
+    private fun verifyLaunch(ctx: Context, target: Target, prevForeground: String?, retried: Boolean) {
+        if (lastForegroundPkg == target.pkg) {
+            // 启动成功 → 延迟用户配置时间后切回上一个应用
             handler.postDelayed({
-                goHome(ctx)
-            }, delay)
+                handleReturn(ctx, target.pkg, prevForeground)
+            }, Prefs.keepAliveReturnDelayMs(ctx))
             return
         }
-        // prev（默认）：延迟后切回上一个软件（前提：确实有上一个前台应用，且不是目标应用自身）
-        if (prevForeground == null || prevForeground == relaunchedPkg) return
-        if (prevForeground == ctx.packageName) return // 上一个软件是本应用自身时不切
-        handler.postDelayed({
-            val intent = AppsRepository.launchIntent(ctx, prevForeground) ?: return@postDelayed
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-            try {
-                ctx.startActivity(intent)
-                Log.i(TAG, "returned to $prevForeground after relaunch")
-            } catch (t: Throwable) {
-                Log.w(TAG, "return to $prevForeground failed", t)
-            }
-        }, delay)
+        if (!retried) {
+            // 第一次没起来，重试 1 次
+            Log.w(TAG, "launch verify failed for ${target.pkg}, retrying")
+            handler.postDelayed({
+                val intent = AppsRepository.launchIntent(ctx, target.pkg) ?: return@postDelayed
+                startActivityViaAccessibility(ctx, intent)
+                handler.postDelayed({
+                    verifyLaunch(ctx, target, prevForeground, retried = true)
+                }, 1_000L)
+            }, 1_000L)
+        } else {
+            // 重试后仍失败，计入监控二级页面
+            EventLog.record(ctx, EventLog.TYPE_WARN, target.pkg,
+                "launch verify failed after retry (not brought to foreground)")
+        }
     }
 
-    private fun goHome(ctx: Context) {
-        try {
-            val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            ctx.startActivity(intent)
-        } catch (t: Throwable) {
-            Log.w(TAG, "go home failed", t)
+    /**
+     * 切回上一个应用（唯一返回方案）。
+     * 返回后 1s 判定是否切成功，没切成功重试 1 次，再失败计入监控。
+     */
+    private fun handleReturn(ctx: Context, relaunchedPkg: String, prevForeground: String?) {
+        // 只保留"返回上一个应用"：没有上一个前台或上一个就是自己/本应用，不切
+        if (prevForeground == null || prevForeground == relaunchedPkg) return
+        if (prevForeground == ctx.packageName) return
+        doReturnTo(ctx, prevForeground, retried = false)
+    }
+
+    private fun doReturnTo(ctx: Context, prevPkg: String, retried: Boolean) {
+        val intent = AppsRepository.launchIntent(ctx, prevPkg) ?: return
+        val ok = startActivityViaAccessibility(ctx, intent)
+        if (!ok && !retried) {
+            // 启动失败，1s 后重试
+            handler.postDelayed({ doReturnTo(ctx, prevPkg, retried = true) }, 1_000L)
+            return
+        }
+        if (ok) {
+            // 返回判定：1s 后检查是否真的切回了上一个应用
+            handler.postDelayed({
+                if (lastForegroundPkg == prevPkg) {
+                    Log.i(TAG, "return verified: now on $prevPkg")
+                } else if (!retried) {
+                    Log.w(TAG, "return verify failed, retrying")
+                    doReturnTo(ctx, prevPkg, retried = true)
+                } else {
+                    EventLog.record(ctx, EventLog.TYPE_WARN, prevPkg,
+                        "return-to-prev failed after retry (not switched back)")
+                }
+            }, 1_000L)
         }
     }
 

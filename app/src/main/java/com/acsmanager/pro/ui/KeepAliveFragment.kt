@@ -102,17 +102,22 @@ class KeepAliveFragment : Fragment() {
         loadApps()
     }
 
-    /** 返回延迟选择：50 / 100 / 200 / 500 / 1000 / 2000 ms 六档。 */
+    /** 返回延迟：点击数字弹输入框，用户填 1~5000ms（1ms 步进）。 */
     private fun pickReturnDelay() {
         val ctx = requireContext()
-        val options = arrayOf(50L, 100L, 200L, 500L, 1000L, 2000L)
-        val labels = options.map { ctx.getString(R.string.keepalive_delay_value_format, it.toInt()) }.toTypedArray()
-        val current = Prefs.keepAliveReturnDelayMs(ctx)
-        val idx = options.indexOf(current).coerceAtLeast(1) // 默认选 100ms
+        val current = Prefs.keepAliveReturnDelayMs(ctx).toInt()
+        val input = android.widget.EditText(ctx).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText(current.toString())
+            setSelection(text.length)
+            hint = "1~5000"
+        }
         androidx.appcompat.app.AlertDialog.Builder(ctx)
             .setTitle(R.string.keepalive_delay_title)
-            .setSingleChoiceItems(labels, idx) { _, which ->
-                Prefs.setKeepAliveReturnDelayMs(ctx, options[which])
+            .setView(input)
+            .setPositiveButton(R.string.ok) { _, _ ->
+                val v = input.text.toString().toIntOrNull() ?: return@setPositiveButton
+                Prefs.setKeepAliveReturnDelayMs(ctx, v.toLong())
                 refreshDelayValue()
             }
             .setNegativeButton(R.string.cancel, null)
@@ -126,34 +131,13 @@ class KeepAliveFragment : Fragment() {
         )
     }
 
-    /** 返回方案选择：拉起保活应用后 100ms 的处理方式。 */
+    /** 返回方案已简化为唯一：切回上一个应用（stay/home 已下线）。 */
     private fun pickReturnMode() {
-        val ctx = requireContext()
-        val options = arrayOf(
-            ctx.getString(R.string.keepalive_return_prev),
-            ctx.getString(R.string.keepalive_return_stay),
-            ctx.getString(R.string.keepalive_return_home)
-        )
-        val values = arrayOf("prev", "stay", "home")
-        val current = Prefs.keepAliveReturnMode(ctx)
-        val idx = values.indexOf(current).coerceAtLeast(0)
-        androidx.appcompat.app.AlertDialog.Builder(ctx)
-            .setTitle(R.string.keepalive_return_title)
-            .setSingleChoiceItems(options, idx) { _, which ->
-                Prefs.setKeepAliveReturnMode(ctx, values[which])
-                refreshReturnValue()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+        // 只保留"返回上一个应用"，不再弹选择
     }
 
     private fun refreshReturnValue() {
-        val mode = Prefs.keepAliveReturnMode(requireContext())
-        binding.tvReturnValue.text = when (mode) {
-            "stay" -> getString(R.string.keepalive_return_stay_short)
-            "home" -> getString(R.string.keepalive_return_home_short)
-            else -> getString(R.string.keepalive_return_prev_short)
-        }
+        binding.tvReturnValue.text = getString(R.string.keepalive_return_prev_short)
     }
 
     private fun loadApps() {

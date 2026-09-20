@@ -260,12 +260,12 @@ object Prefs {
         get(ctx).edit().putString("keepalive_return_mode", v).apply()
     }
 
-    /** 拉起后等待多少毫秒再切回上一应用（默认 100ms，用户可自定义 50~2000ms）。 */
+    /** 拉起后等待多少毫秒再切回上一个应用（默认 100ms，用户可自定义 1~5000ms，1ms 步进）。 */
     fun keepAliveReturnDelayMs(ctx: Context): Long =
         get(ctx).getLong("keepalive_return_delay", 100L)
 
     fun setKeepAliveReturnDelayMs(ctx: Context, v: Long) {
-        get(ctx).edit().putLong("keepalive_return_delay", v.coerceIn(50L, 2000L)).apply()
+        get(ctx).edit().putLong("keepalive_return_delay", v.coerceIn(1L, 5000L)).apply()
     }
 
     // ---------- 统计 ----------
