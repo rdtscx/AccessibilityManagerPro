@@ -43,13 +43,22 @@ object KeepAliveEngine {
 
     private const val TAG = "AcsKeepAlive"
 
-    private class Target(val pkg: String) {
+    private class Target(
+        /** 所属包名（存活判定用）。 */
+        val pkg: String,
+        /** 单独保活的组件名（ComponentName.flattenToString()）；整包保活为 null。 */
+        val component: String? = null
+    ) {
         var lastForegroundMs = 0L
         var lastWindowMs = 0L
         var lastCheckMs = 0L
         var lastRelaunchMs = 0L
         var relaunchCount = 0
     }
+
+    /** targets 的 key：整包保活用包名；组件保活用 "pkg/cls"。 */
+    private fun targetKey(pkg: String, component: String?): String =
+        if (component == null) pkg else "$pkg/$component"
 
     private val targets = ConcurrentHashMap<String, Target>()
     private val handler = Handler(Looper.getMainLooper())
@@ -106,13 +115,30 @@ object KeepAliveEngine {
         Log.d(TAG, "doze: keepalive resumed")
     }
 
-    /** 重新加载保活名单；名单非空时确保巡检已调度（名单为空则不调度，零开销）。 */
+    /** 重新加载保活名单；名单非空时确保巡检已调度（名单为空则不调度，零开销）。
+     *  同时加载两类目标：整包保活（[Prefs.keepAliveApps]）+ 单组件保活（[Prefs.keepAliveComponents]）。 */
     fun reloadTargets(ctx: Context) {
-        val selected = Prefs.keepAliveApps(ctx)
-        targets.keys.removeAll { it !in selected }
-        for (pkg in selected) {
-            targets.getOrPut(pkg) { Target(pkg) }
+        val selectedPkgs = Prefs.keepAliveApps(ctx)
+        val selectedComps = Prefs.keepAliveComponents(ctx)
+        // 收集本次应保留的所有 key
+        val wanted = HashSet<String>()
+        for (pkg in selectedPkgs) {
+            val key = targetKey(pkg, null)
+            wanted.add(key)
+            targets.getOrPut(key) { Target(pkg, null) }
         }
+        for (flat in selectedComps) {
+            // flat 形如 "pkg/com.example.MyService"
+            val idx = flat.indexOf('/')
+            if (idx <= 0 || idx >= flat.length - 1) continue
+            val pkg = flat.substring(0, idx)
+            val cls = flat.substring(idx + 1)
+            val key = targetKey(pkg, cls)
+            wanted.add(key)
+            targets.getOrPut(key) { Target(pkg, cls) }
+        }
+        // 清理已取消勾选的旧目标
+        targets.keys.removeAll { it !in wanted }
         handler.removeCallbacks(checkRunnable)
         if (targets.isNotEmpty() && service != null) {
             handler.postDelayed(checkRunnable, Prefs.keepAliveIntervalMs(ctx).coerceIn(10_000L, 300_000L))
@@ -308,14 +334,30 @@ object KeepAliveEngine {
     // ---------- 拉起 + 返回上一应用 ----------
 
     private fun relaunch(ctx: Context, target: Target) {
-        val intent = AppsRepository.launchIntent(ctx, target.pkg) ?: return
-        intent.addFlags(
-            Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-        )
         // 记录"用户上一个软件"：拉起前的前台应用（返回方案 prev 用）
         val prevForeground = lastForegroundPkg
+        var launched = false
         try {
-            ctx.startActivity(intent)
+            if (target.component != null) {
+                // 单组件保活（通常是 Service）：普通 startForegroundService 需要前台或后台启动权限，
+                // 走 Root/Shizuku shell 用 am start-foreground-service 拉起。
+                val flat = "${target.pkg}/${target.component}"
+                Privilege.execShell(ctx, "am", "start-foreground-service", "-n", flat)
+                    ?: Privilege.execShell(ctx, "am", "startservice", "-n", flat)
+                launched = true
+            } else {
+                // 整包保活：用 LaunchIntent 拉起主 Activity
+                val intent = AppsRepository.launchIntent(ctx, target.pkg) ?: return
+                intent.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                )
+                ctx.startActivity(intent)
+                launched = true
+            }
+            if (!launched) {
+                EventLog.record(ctx, EventLog.TYPE_WARN, target.pkg, "relaunch: no launch path")
+                return
+            }
             target.lastRelaunchMs = SystemClock.elapsedRealtime()
             target.relaunchCount++
             Prefs.bumpRelaunch(ctx)
@@ -328,7 +370,7 @@ object KeepAliveEngine {
                 target.pkg,
                 ctx.getString(R.string.keepalive_log_relaunched, target.relaunchCount)
             )
-            Log.i(TAG, "silently relaunched ${target.pkg}")
+            Log.i(TAG, "silently relaunched ${target.pkg}${target.component?.let { "/$it" } ?: ""}")
 
             // 实验选项：拉起时显示 Toast 提示（默认关闭；自定义文案优先）
             if (Prefs.relaunchToastEnabled(ctx)) {
@@ -341,7 +383,7 @@ object KeepAliveEngine {
                 }
             }
 
-            // 100ms 后按"返回方案"处理（无感保活：拉起后立即切回用户上一个软件）
+            // 按用户配置的延迟后按"返回方案"处理（无感保活：拉起后立即切回用户上一个软件）
             handleReturn(ctx, target.pkg, prevForeground)
         } catch (t: Throwable) {
             Log.w(TAG, "relaunch ${target.pkg} failed", t)
@@ -350,7 +392,7 @@ object KeepAliveEngine {
     }
 
     /**
-     * 拉起后 100ms 按用户选择的返回方案处理：
+     * 拉起后按用户配置的延迟（默认 100ms）按返回方案处理：
      *  - prev：切回用户上一个软件（默认，无感保活）；
      *  - stay：停留在目标软件；
      *  - home：返回桌面。
@@ -358,13 +400,14 @@ object KeepAliveEngine {
     private fun handleReturn(ctx: Context, relaunchedPkg: String, prevForeground: String?) {
         val mode = Prefs.keepAliveReturnMode(ctx)
         if (mode == "stay") return
+        val delay = Prefs.keepAliveReturnDelayMs(ctx)
         if (mode == "home") {
             handler.postDelayed({
                 goHome(ctx)
-            }, 100L)
+            }, delay)
             return
         }
-        // prev（默认）：100ms 后切回上一个软件（前提：确实有上一个前台应用，且不是目标应用自身）
+        // prev（默认）：延迟后切回上一个软件（前提：确实有上一个前台应用，且不是目标应用自身）
         if (prevForeground == null || prevForeground == relaunchedPkg) return
         if (prevForeground == ctx.packageName) return // 上一个软件是本应用自身时不切
         handler.postDelayed({
@@ -376,7 +419,7 @@ object KeepAliveEngine {
             } catch (t: Throwable) {
                 Log.w(TAG, "return to $prevForeground failed", t)
             }
-        }, 100L)
+        }, delay)
     }
 
     private fun goHome(ctx: Context) {

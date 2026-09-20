@@ -73,24 +73,31 @@ class KeepAliveAdapter(
             binding.cbProtect.isChecked = entry.packageName in protectedSet
             binding.btnRelaunch.isEnabled = entry.hasLauncher
 
-            // 状态点：前台 / 运行中 / 已停止
-            val fg = KeepAliveEngine.lastForeground()
-            val state = when {
-                fg == entry.packageName -> R.string.app_state_foreground
-                KeepAliveEngine.isTargetAlive(ctx, entry.packageName) -> R.string.app_state_running
-                else -> R.string.app_state_stopped
-            }
-            binding.tvState.text = ctx.getString(state)
-            binding.tvState.setTextColor(
-                ContextCompat.getColor(
-                    ctx,
-                    when {
-                        fg == entry.packageName -> R.color.status_ok
-                        state != R.string.app_state_stopped -> R.color.status_warn
-                        else -> R.color.status_err
-                    }
+            // 已保活：绿色圆点 + "已保活"绿色文字；未保活：正常状态点（前台/运行/已停止）
+            val isKept = entry.packageName in protectedSet
+            binding.dotKept.visibility = if (isKept) android.view.View.VISIBLE else android.view.View.GONE
+            if (isKept) {
+                binding.tvState.text = ctx.getString(R.string.keepalive_status_kept)
+                binding.tvState.setTextColor(ContextCompat.getColor(ctx, R.color.status_ok))
+            } else {
+                val fg = KeepAliveEngine.lastForeground()
+                val state = when {
+                    fg == entry.packageName -> R.string.app_state_foreground
+                    KeepAliveEngine.isTargetAlive(ctx, entry.packageName) -> R.string.app_state_running
+                    else -> R.string.app_state_stopped
+                }
+                binding.tvState.text = ctx.getString(state)
+                binding.tvState.setTextColor(
+                    ContextCompat.getColor(
+                        ctx,
+                        when {
+                            fg == entry.packageName -> R.color.status_ok
+                            state != R.string.app_state_stopped -> R.color.status_warn
+                            else -> R.color.status_err
+                        }
+                    )
                 )
-            )
+            }
         }
     }
 

@@ -96,8 +96,34 @@ class KeepAliveFragment : Fragment() {
 
         // 拉起后返回方案（用户可自选：切回上一应用 / 停留 / 回桌面）
         binding.rowReturnMode.setOnClickListener { pickReturnMode() }
+        // 拉起后返回延迟（用户可自定义 50~2000ms）
+        binding.rowReturnDelay.setOnClickListener { pickReturnDelay() }
 
         loadApps()
+    }
+
+    /** 返回延迟选择：50 / 100 / 200 / 500 / 1000 / 2000 ms 六档。 */
+    private fun pickReturnDelay() {
+        val ctx = requireContext()
+        val options = arrayOf(50L, 100L, 200L, 500L, 1000L, 2000L)
+        val labels = options.map { ctx.getString(R.string.keepalive_delay_value_format, it.toInt()) }.toTypedArray()
+        val current = Prefs.keepAliveReturnDelayMs(ctx)
+        val idx = options.indexOf(current).coerceAtLeast(1) // 默认选 100ms
+        androidx.appcompat.app.AlertDialog.Builder(ctx)
+            .setTitle(R.string.keepalive_delay_title)
+            .setSingleChoiceItems(labels, idx) { _, which ->
+                Prefs.setKeepAliveReturnDelayMs(ctx, options[which])
+                refreshDelayValue()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun refreshDelayValue() {
+        binding.tvDelayValue.text = getString(
+            R.string.keepalive_delay_value_format,
+            Prefs.keepAliveReturnDelayMs(requireContext()).toInt()
+        )
     }
 
     /** 返回方案选择：拉起保活应用后 100ms 的处理方式。 */
@@ -174,6 +200,7 @@ class KeepAliveFragment : Fragment() {
             Prefs.setKeepAliveBlackScreen(ctx, checked)
         }
         refreshReturnValue()
+        refreshDelayValue()
     }
 
     private fun hasUsageAccess(ctx: Context): Boolean = try {
