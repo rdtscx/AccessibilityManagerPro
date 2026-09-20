@@ -275,15 +275,18 @@ object Prefs {
         get(ctx).edit().putInt("notif_block_count", 0).apply()
     }
 
-    // ---------- 累计拉起次数（无障碍 + 应用保活，永久不重置） ----------
+    // ---------- 本次运行累计拉起次数（App 启动后从零开始，进程死亡即归零） ----------
 
-    /** 自监控/保活累计成功拉起次数（跨版本、跨天累计，不重置）。 */
-    fun totalPullCount(ctx: Context): Int =
-        get(ctx).getInt("total_pull_count", 0)
+    /** 本次运行期间累计拉起次数（无障碍 + 应用保活合计）。不持久化，App 启动后从 0 开始。 */
+    @Volatile
+    private var runtimePullCount: Int = 0
+
+    /** 读取本次运行累计拉起次数。 */
+    fun totalPullCount(ctx: Context): Int = runtimePullCount
 
     /** 累计拉起次数 +1，并持久化。 */
     fun bumpTotalPull(ctx: Context) {
-        get(ctx).edit().putInt("total_pull_count", totalPullCount(ctx) + 1).apply()
+        runtimePullCount += 1
     }
 
     // ---------- 通知 0-5 级调控 ----------
