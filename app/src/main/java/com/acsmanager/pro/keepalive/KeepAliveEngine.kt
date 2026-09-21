@@ -199,6 +199,9 @@ object KeepAliveEngine {
         }
         // 纯被动：不启动定时巡检，只等无障碍窗口事件
         handler.removeCallbacks(checkRunnable)
+
+        // V3.3：同步通知无障碍服务刷新目标包名过滤列表（省电优化）
+        (service as? SelfAccessService)?.reloadTargetPkgs()
     }
 
     /**

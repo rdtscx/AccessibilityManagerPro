@@ -87,6 +87,15 @@ class NotifGateService : NotificationListenerService() {
         // 记录完整通知历史（二级页列表用）
         Prefs.appendNotifHistoryFull(this, pkg, channelId, title, text)
 
+        // V3.4：关键词过滤——命中关键词的通知直接拦截
+        if (Prefs.notifMatchesFilter(this, pkg, title, text)) {
+            cancelNotification(sbn.key)
+            Prefs.bumpNotifBlock(this)
+            Prefs.appendNotifHistory(this, pkg, "keyword_block")
+            EventLog.record(this, EventLog.TYPE_DISABLE, pkg, "notification blocked by keyword")
+            return
+        }
+
         // 隐藏渠道：直接取消不显示
         if (Prefs.isChannelHidden(this, pkg, channelId)) {
             cancelNotification(sbn.key)

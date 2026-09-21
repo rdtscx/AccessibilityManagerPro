@@ -493,6 +493,49 @@ object Prefs {
         get(ctx).edit().remove("notif_history_v2").apply()
     }
 
+    // ---------- 通知关键词过滤（V3.4 新增） ----------
+
+    /** 按包名存储的过滤关键词列表，格式：pkg -> ["广告","推广"] */
+    fun notifFilterKeywords(ctx: Context, pkg: String): List<String> {
+        val raw = get(ctx).getString("notif_filter_keywords", "{}") ?: "{}"
+        return try {
+            val o = org.json.JSONObject(raw)
+            o.optJSONArray(pkg)?.let { arr ->
+                (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotBlank() }
+            } ?: emptyList()
+        } catch (t: Throwable) { emptyList() }
+    }
+
+    fun setNotifFilterKeywords(ctx: Context, pkg: String, keywords: List<String>) {
+        val raw = get(ctx).getString("notif_filter_keywords", "{}") ?: "{}"
+        try {
+            val o = org.json.JSONObject(raw)
+            if (keywords.isEmpty()) {
+                o.remove(pkg)
+            } else {
+                o.put(pkg, org.json.JSONArray(keywords))
+            }
+            get(ctx).edit().putString("notif_filter_keywords", o.toString()).apply()
+        } catch (t: Throwable) {}
+    }
+
+    /** 全局关键词过滤开关 */
+    fun notifFilterEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("notif_filter_enabled", false)
+
+    fun setNotifFilterEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("notif_filter_enabled", v).apply()
+    }
+
+    /** 检查通知标题/正文是否命中过滤关键词 */
+    fun notifMatchesFilter(ctx: Context, pkg: String, title: String, text: String): Boolean {
+        if (!notifFilterEnabled(ctx)) return false
+        val keywords = notifFilterKeywords(ctx, pkg)
+        if (keywords.isEmpty()) return false
+        val content = "$title $text"
+        return keywords.any { kw -> content.contains(kw, ignoreCase = true) }
+    }
+
     // ---------- 无障碍权限锁定保活（应用级无障碍总控） ----------
 
     /** 已锁定保活的无障碍服务组件串集合（被关闭后自动无感拉起）。 */
