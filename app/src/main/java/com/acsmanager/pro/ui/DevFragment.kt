@@ -56,32 +56,12 @@ class DevFragment : Fragment() {
         try {
             binding.recycler.layoutManager = LinearLayoutManager(requireContext())
             binding.recycler.adapter = adapter
-
-            binding.btnPresetFast.setOnClickListener { applyPreset(DevOptions.Preset.FAST) }
-            binding.btnPresetExtreme.setOnClickListener { applyPreset(DevOptions.Preset.EXTREME) }
-            binding.btnPresetDefault.setOnClickListener { applyPreset(DevOptions.Preset.DEFAULT) }
         } catch (t: Throwable) {
             android.widget.Toast.makeText(
                 requireContext(),
                 "开发者页面初始化失败: ${t.message}",
                 android.widget.Toast.LENGTH_LONG
             ).show()
-        }
-    }
-
-    private fun applyPreset(preset: DevOptions.Preset) {
-        val ctx = requireContext()
-        scope.launch {
-            val results = withContext(Dispatchers.IO) { DevOptions.applyPreset(ctx, preset) }
-            val ok = results.values.count { it.ok }
-            val total = results.size
-            val msg = when {
-                ok == total -> getString(R.string.dev_preset_ok, getString(preset.labelRes))
-                ok == 0 -> getString(R.string.dev_preset_fail)
-                else -> getString(R.string.dev_preset_partial, getString(preset.labelRes), ok, total)
-            }
-            Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
-            adapter.notifyDataSetChanged()
         }
     }
 

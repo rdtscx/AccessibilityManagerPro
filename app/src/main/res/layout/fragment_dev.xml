@@ -13,37 +13,6 @@
         android:textColor="?android:attr/textColorSecondary"
         android:paddingBottom="8dp" />
 
-    <!-- 一键模式 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="8dp">
-
-        <Button
-            android:id="@+id/btn_preset_fast"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:text="@string/dev_preset_fast" />
-
-        <Button
-            android:id="@+id/btn_preset_extreme"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:text="@string/dev_preset_extreme" />
-
-        <Button
-            android:id="@+id/btn_preset_default"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/dev_preset_default" />
-    </LinearLayout>
-
     <!-- 开发者选项列表 -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler"
