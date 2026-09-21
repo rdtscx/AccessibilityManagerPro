@@ -144,51 +144,51 @@ class HomeFragment : Fragment() {
      * 一键优化：
      * 1. 检查无障碍服务
      * 2. 优化本软件内部设置
-     * 3. 弹窗提示还需手动配置的系统项
+     * 3. Toast 提示结果
      */
     private fun performOneClickOptimize() {
-        val ctx = requireContext()
+        try {
+            val ctx = requireContext()
 
-        // 第一步：检查无障碍服务
-        if (!selfAccessEnabled(ctx)) {
-            Toast.makeText(ctx, "请先开启无障碍服务", Toast.LENGTH_LONG).show()
-            startActivity(
-                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-            return
-        }
+            // 检查无障碍服务
+            if (!selfAccessEnabled(ctx)) {
+                Toast.makeText(ctx, "请先开启无障碍服务", Toast.LENGTH_LONG).show()
+                startActivity(
+                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                return
+            }
 
-        // 第二步：优化本软件内部设置
-        val actions = com.acsmanager.pro.health.HealthDiagnosis.autoOptimize(ctx)
+            // 优化内部设置
+            val actions = com.acsmanager.pro.health.HealthDiagnosis.autoOptimize(ctx)
 
-        // 第三步：检查系统级配置状态，给出引导
-        val romCompat = com.acsmanager.pro.compat.RomCompatibilityHelper
-        val tips = mutableListOf<String>()
+            // 检查电池优化状态
+            val batteryOk = try {
+                com.acsmanager.pro.compat.RomCompatibilityHelper
+                    .isIgnoringBatteryOptimizations(ctx)
+            } catch (_: Throwable) { true }
 
-        if (!romCompat.isIgnoringBatteryOptimizations(ctx)) {
-            tips.add("电池优化：建议设为「不优化」")
-        }
-
-        if (actions.isNotEmpty()) {
-            tips.add("已自动开启：${actions.joinToString("、")}")
-        }
-
-        if (tips.isEmpty()) {
-            Toast.makeText(ctx, "已是最佳配置，无需调整", Toast.LENGTH_LONG).show()
-        } else {
-            val message = tips.joinToString("\n")
-            android.app.AlertDialog.Builder(ctx)
-                .setTitle("优化完成")
-                .setMessage(message)
-                .setPositiveButton("去设置电池优化") { _, _ ->
-                    romCompat.requestIgnoreBatteryOptimization(ctx)
+            // 纯 Toast 提示，不用 Dialog 避免 ROM 主题不匹配闪退
+            val msg = buildString {
+                if (actions.isNotEmpty()) {
+                    append("已开启：${actions.joinToString("、")}")
+                } else {
+                    append("内部设置已是最佳")
                 }
-                .setNegativeButton("知道了", null)
-                .show()
-        }
+                if (!batteryOk) {
+                    append("\n电池优化建议设为不优化")
+                }
+            }
+            Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
 
-        try { refresh() } catch (_: Throwable) {}
+            try { refresh() } catch (_: Throwable) {}
+        } catch (t: Throwable) {
+            android.util.Log.e("HomeFragment", "一键优化失败", t)
+            try {
+                Toast.makeText(requireContext(), "优化出错", Toast.LENGTH_SHORT).show()
+            } catch (_: Throwable) {}
+        }
     }
 
     override fun onStart() {
