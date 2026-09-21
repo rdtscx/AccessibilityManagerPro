@@ -424,4 +424,11 @@
     <string name="health_mode_normal">标准</string>
     <string name="health_mode_low_power">低功耗</string>
     <string name="health_mode_suspended">已暂停</string>
+
+    <!-- V4.0：一键优化 -->
+    <string name="home_one_click_optimize">一键优化</string>
+    <string name="home_one_click_optimize_desc">自动检测并应用最佳保活配置</string>
+    <string name="home_optimize_btn">立即优化</string>
+    <string name="home_optimize_success">优化完成，共调整 %1$d 项</string>
+    <string name="home_optimize_already">已是最佳配置，无需优化</string>
 </resources>

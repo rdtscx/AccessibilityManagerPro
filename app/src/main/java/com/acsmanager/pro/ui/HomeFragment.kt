@@ -124,6 +124,19 @@ class HomeFragment : Fragment() {
         binding.btnSettingsEntry.setOnClickListener {
             (activity as? MainActivity)?.openFragment(SettingsFragment())
         }
+
+        // V4.0：一键优化
+        binding.btnOneClickOptimize.setOnClickListener {
+            val actions = com.acsmanager.pro.health.HealthDiagnosis.autoOptimize(requireContext())
+            val msg = if (actions.isEmpty()) {
+                getString(R.string.home_optimize_already)
+            } else {
+                getString(R.string.home_optimize_success, actions.size) +
+                    "\n" + actions.joinToString("\n") { "• $it" }
+            }
+            Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show()
+            refresh()
+        }
     }
 
     override fun onStart() {
