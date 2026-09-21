@@ -101,7 +101,14 @@ object AdaptiveHeartbeatManager {
             }
         }
 
-        context.registerReceiver(stateReceiver, filter)
+        // Android 13+ (API 33+) 必须显式指定 RECEIVER_NOT_EXPORTED 或 RECEIVER_EXPORTED，
+        // 否则抛 SecurityException 导致应用闪退（一键优化启动服务后必崩）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(stateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(stateReceiver, filter)
+        }
 
         // 初始化状态
         updateInitialState(context)

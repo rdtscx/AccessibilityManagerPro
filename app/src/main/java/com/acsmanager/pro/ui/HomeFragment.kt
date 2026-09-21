@@ -125,17 +125,31 @@ class HomeFragment : Fragment() {
             (activity as? MainActivity)?.openFragment(SettingsFragment())
         }
 
-        // V4.0：一键优化
+        // V4.0：一键优化（整体 try-catch 保护，防止任何意外导致闪退）
         binding.btnOneClickOptimize.setOnClickListener {
-            val actions = com.acsmanager.pro.health.HealthDiagnosis.autoOptimize(requireContext())
-            val msg = if (actions.isEmpty()) {
-                getString(R.string.home_optimize_already)
-            } else {
-                getString(R.string.home_optimize_success, actions.size) +
-                    "\n" + actions.joinToString("\n") { "• $it" }
+            try {
+                val actions = com.acsmanager.pro.health.HealthDiagnosis.autoOptimize(requireContext())
+                val msg = if (actions.isEmpty()) {
+                    getString(R.string.home_optimize_already)
+                } else {
+                    getString(R.string.home_optimize_success, actions.size) +
+                        "\n" + actions.joinToString("\n") { "• $it" }
+                }
+                Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show()
+                // refresh() 也包一层，防止状态更新时崩溃
+                try {
+                    refresh()
+                } catch (t: Throwable) {
+                    android.util.Log.w("HomeFragment", "refresh after optimize failed", t)
+                }
+            } catch (t: Throwable) {
+                android.util.Log.e("HomeFragment", "一键优化失败", t)
+                Toast.makeText(
+                    requireContext(),
+                    "优化出错：${t.javaClass.simpleName}: ${t.message}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
-            Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show()
-            refresh()
         }
     }
 

@@ -195,7 +195,9 @@ object HealthDiagnosis {
                 SelfGuardService.start(ctx)
                 actions.add("已开启自监控保活")
             }
-        } catch (t: Throwable) {}
+        } catch (t: Throwable) {
+            android.util.Log.w("HealthDiagnosis", "开启自监控保活失败", t)
+        }
 
         // 2. 启用看门狗
         try {
@@ -204,7 +206,9 @@ object HealthDiagnosis {
                 com.acsmanager.pro.watchdog.WatchdogService.start(ctx)
                 actions.add("已开启看门狗守护")
             }
-        } catch (t: Throwable) {}
+        } catch (t: Throwable) {
+            android.util.Log.w("HealthDiagnosis", "开启看门狗失败", t)
+        }
 
         // 3. 启用通知历史记录
         try {
@@ -212,7 +216,9 @@ object HealthDiagnosis {
                 com.acsmanager.pro.util.Prefs.setNotifHistoryEnabled(ctx, true)
                 actions.add("已开启通知历史记录")
             }
-        } catch (t: Throwable) {}
+        } catch (t: Throwable) {
+            android.util.Log.w("HealthDiagnosis", "开启通知历史记录失败", t)
+        }
 
         // 4. 设置合理的事件节流（默认 300ms）
         try {
@@ -221,7 +227,9 @@ object HealthDiagnosis {
                 com.acsmanager.pro.util.Prefs.setEventThrottleMs(ctx, 300)
                 actions.add("已优化事件节流（省电模式）")
             }
-        } catch (t: Throwable) {}
+        } catch (t: Throwable) {
+            android.util.Log.w("HealthDiagnosis", "优化事件节流失败", t)
+        }
 
         return actions
     }

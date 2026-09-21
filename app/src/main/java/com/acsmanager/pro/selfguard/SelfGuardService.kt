@@ -232,7 +232,13 @@ class SelfGuardService : Service() {
                 addAction(Intent.ACTION_SCREEN_OFF)
                 addAction(Intent.ACTION_SCREEN_ON)
             }
-            registerReceiver(screenReceiver, filter)
+            // Android 13+ (API 33+) 必须显式指定 RECEIVER_NOT_EXPORTED，否则 SecurityException 闪退
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(screenReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                registerReceiver(screenReceiver, filter)
+            }
             Log.i(TAG, "Screen state receiver registered")
         }
         // 启动后立即检测一次：覆盖开机、服务重启、应用从后台恢复等场景，
