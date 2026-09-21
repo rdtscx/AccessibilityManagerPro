@@ -142,10 +142,9 @@ class HomeFragment : Fragment() {
 
     /**
      * 一键优化：
-     * 1. 检查无障碍服务是否已开启
-     * 2. 优化本软件内部设置（自监控、看门狗、通知历史等）
-     * 3. 跳转自启动设置，通过无障碍自动开启本软件自启动
-     * 4. 跳转电池优化设置，通过无障碍自动将本软件设为不优化
+     * 1. 检查无障碍服务
+     * 2. 优化本软件内部设置
+     * 3. 弹窗提示还需手动配置的系统项
      */
     private fun performOneClickOptimize() {
         val ctx = requireContext()
@@ -163,28 +162,31 @@ class HomeFragment : Fragment() {
         // 第二步：优化本软件内部设置
         val actions = com.acsmanager.pro.health.HealthDiagnosis.autoOptimize(ctx)
 
-        // 第三步：跳转自启动设置，无障碍自动操作
+        // 第三步：检查系统级配置状态，给出引导
         val romCompat = com.acsmanager.pro.compat.RomCompatibilityHelper
-        val romName = romCompat.detectRom().displayName
+        val tips = mutableListOf<String>()
 
-        // 设置无障碍服务为"自动操作模式"
-        SelfAccessService.autoOptimizeMode = SelfAccessService.MODE_AUTO_START
-
-        val startedAutoStart = romCompat.openAutoStartSettings(ctx)
-        if (!startedAutoStart) {
-            Toast.makeText(ctx, "当前系统不支持自动跳转自启动设置，请手动开启", Toast.LENGTH_LONG).show()
-            SelfAccessService.autoOptimizeMode = SelfAccessService.MODE_NONE
-        } else {
-            Toast.makeText(ctx, "正在自动开启自启动...", Toast.LENGTH_SHORT).show()
+        if (!romCompat.isIgnoringBatteryOptimizations(ctx)) {
+            tips.add("电池优化：建议设为「不优化」")
         }
 
-        // 显示结果
-        val resultMsg = if (actions.isNotEmpty()) {
-            "已优化内部设置 ${actions.size} 项"
-        } else {
-            "内部设置已是最佳"
+        if (actions.isNotEmpty()) {
+            tips.add("已自动开启：${actions.joinToString("、")}")
         }
-        Toast.makeText(ctx, "$resultMsg\nROM: $romName", Toast.LENGTH_LONG).show()
+
+        if (tips.isEmpty()) {
+            Toast.makeText(ctx, "已是最佳配置，无需调整", Toast.LENGTH_LONG).show()
+        } else {
+            val message = tips.joinToString("\n")
+            android.app.AlertDialog.Builder(ctx)
+                .setTitle("优化完成")
+                .setMessage(message)
+                .setPositiveButton("去设置电池优化") { _, _ ->
+                    romCompat.requestIgnoreBatteryOptimization(ctx)
+                }
+                .setNegativeButton("知道了", null)
+                .show()
+        }
 
         try { refresh() } catch (_: Throwable) {}
     }
