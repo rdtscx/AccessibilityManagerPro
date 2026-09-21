@@ -407,4 +407,21 @@
     <string name="permdetail_not_granted">未授予</string>
     <string name="permdetail_adb_hint">需 ADB 执行</string>
     <string name="permdetail_switch">权限开关</string>
+
+    <!-- 健康度仪表盘（V3.3） -->
+    <string name="health_dashboard_title">健康度仪表盘</string>
+    <string name="health_uptime">存活时长</string>
+    <string name="health_killed_today">今日被杀</string>
+    <string name="health_success_rate">拉起成功率</string>
+    <string name="health_level_excellent">优秀</string>
+    <string name="health_level_good">良好</string>
+    <string name="health_level_normal">一般</string>
+    <string name="health_level_poor">较差</string>
+    <string name="health_level_danger">危险</string>
+    <string name="health_heartbeat_mode">模式：%1$s</string>
+    <string name="health_battery_drain">预估耗电：%1$.1f%%/天</string>
+    <string name="health_mode_performance">高性能</string>
+    <string name="health_mode_normal">标准</string>
+    <string name="health_mode_low_power">低功耗</string>
+    <string name="health_mode_suspended">已暂停</string>
 </resources>

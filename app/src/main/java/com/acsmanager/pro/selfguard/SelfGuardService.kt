@@ -22,7 +22,10 @@ import com.acsmanager.pro.R
 import com.acsmanager.pro.core.AccessServiceRepo
 import com.acsmanager.pro.core.Privilege
 import com.acsmanager.pro.core.ServiceStateController
+import com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager
 import com.acsmanager.pro.keepalive.KeepAliveEngine
+import com.acsmanager.pro.keepalive.ResourceMonitor
+import com.acsmanager.pro.security.AuditLogger
 import com.acsmanager.pro.ui.MainActivity
 import com.acsmanager.pro.util.Prefs
 import com.acsmanager.pro.watchdog.EventLog
@@ -114,6 +117,9 @@ class SelfGuardService : Service() {
     private var observerRegistered = false
     private var screenReceiverRegistered = false
 
+    /** 资源监控器（熔断机制） */
+    private val resourceMonitor by lazy { ResourceMonitor(this) }
+
     /** 屏幕状态广播：熄屏进入休眠（暂停保活巡检），亮屏恢复。 */
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -156,13 +162,45 @@ class SelfGuardService : Service() {
     /** 防抖后的实际检测入口。 */
     private val debounceRunnable = Runnable { onSecureChanged() }
 
-    /** 兜底慢检：ContentObserver 意外失效时的最后防线。亮屏 5 分钟，熄屏休眠 15 分钟。 */
+    /** 兜底慢检：ContentObserver 意外失效时的最后防线。
+     *  V3.3：使用自适应心跳策略，根据设备状态动态调整间隔。
+     *  - 熔断模式（低电量/过热）：完全暂停
+     *  - 息屏低功耗：15 分钟
+     *  - 亮屏标准：5 分钟
+     *  - 充电高性能：2 分钟
+     */
     private val fallbackRunnable = object : Runnable {
         override fun run() {
+            // 熔断模式下跳过本次检测
+            if (AdaptiveHeartbeatManager.isSuspended()) {
+                Log.d(TAG, "circuit breaker active, skip fallback check")
+                return
+            }
             onSecureChanged()
-            val interval = if (Prefs.isDozeActive()) 15 * 60_000L else 5 * 60_000L
+            val interval = getCurrentHeartbeatInterval()
             handler.postDelayed(this, interval)
         }
+    }
+
+    /**
+     * 获取当前自适应心跳间隔（毫秒）。
+     * 综合考虑：熔断状态、屏幕状态、充电状态、用户设置。
+     */
+    private fun getCurrentHeartbeatInterval(): Long {
+        // 熔断模式：不应该走到这里，但兜底处理
+        if (AdaptiveHeartbeatManager.isSuspended()) {
+            return 30 * 60_000L // 30分钟后再检查熔断是否解除
+        }
+
+        // 优先使用自适应心跳管理器推荐的间隔
+        val adaptiveInterval = AdaptiveHeartbeatManager.getRecommendedIntervalMs()
+        if (adaptiveInterval > 0) {
+            // 基础间隔：自适应模式推荐值
+            return adaptiveInterval * 2 // ContentObserver 是事件驱动，兜底检查频率减半
+        }
+
+        // 兜底：原有息屏/亮屏逻辑
+        return if (Prefs.isDozeActive()) 15 * 60_000L else 5 * 60_000L
     }
 
     private var restoringServices = mutableSetOf<String>()
@@ -174,6 +212,11 @@ class SelfGuardService : Service() {
         }
         createChannel()
         startAsForeground(buildNotification())
+
+        // V3.3：注册自适应心跳管理器（监听充电、屏幕、电量、温度）
+        AdaptiveHeartbeatManager.register(this)
+        com.acsmanager.pro.health.HealthDashboardManager.onServiceStarted()
+
         if (!observerRegistered) {
             observerRegistered = true
             contentResolver.registerContentObserver(
@@ -302,7 +345,17 @@ class SelfGuardService : Service() {
         // 逐条记录丢失事件：pkg = 被关闭服务的包名，detail = 完整组件名
         for (flat in pending) {
             val pkg = flat.substringBefore('/')
-            EventLog.record(this, EventLog.TYPE_LOST, pkg, "accessibility off: $flat")
+            EventLog.record(this, EventLog.TYPE_LOST, pkg, "accessibility off: $flat", EventLog.LEVEL_WARN)
+            // V3.3：统计今日被杀次数
+            Prefs.bumpTodayKilled(this)
+            // V3.3：审计日志记录服务丢失
+            AuditLogger.log(
+                this,
+                AuditLogger.OP_SERVICE_RESTORE,
+                targetPackage = pkg,
+                purpose = "无障碍服务被关闭，触发自动恢复",
+                success = false
+            )
         }
 
         // 恢复延迟策略：自身服务用用户配置的延迟（默认1s，给系统处理时间）；
@@ -493,7 +546,26 @@ class SelfGuardService : Service() {
             if (successList.isNotEmpty()) {
                 // 每个成功拉起的无障碍服务都计入累计拉起次数
                 repeat(successList.size) { Prefs.bumpTotalPull(this@SelfGuardService) }
+                repeat(successList.size) { Prefs.bumpTodayRestored(this@SelfGuardService) }
+
+                // V3.3：审计日志记录服务自动恢复
+                for (flat in successList) {
+                    val pkg = flat.substringBefore('/')
+                    AuditLogger.log(
+                        this@SelfGuardService,
+                        AuditLogger.OP_SERVICE_RESTORE,
+                        targetPackage = pkg,
+                        purpose = "无障碍服务自动恢复（通道：$channel）",
+                        success = true
+                    )
+                }
+
                 notifyRestored(successList.size)
+            }
+
+            // 记录失败的恢复次数
+            if (failList.isNotEmpty()) {
+                repeat(failList.size) { Prefs.bumpTodayRestoreFailed(this@SelfGuardService) }
             }
 
             // 成功的服务从 restoringServices 移除
@@ -654,6 +726,7 @@ class SelfGuardService : Service() {
             screenReceiverRegistered = false
         }
         Prefs.setDozeActive(false)
+        AdaptiveHeartbeatManager.unregister(this)
         handler.removeCallbacks(fallbackRunnable)
         handler.removeCallbacksAndMessages(null)
         scope.cancel()

@@ -613,4 +613,71 @@ object Prefs {
         }
         return true
     }
+
+    // ---------- 自适应心跳与熔断 ----------
+
+    /** 低电量阈值（百分比），低于此值进入熔断模式。默认 15%。 */
+    fun lowBatteryThreshold(ctx: Context): Int =
+        get(ctx).getInt("low_battery_threshold", 15)
+
+    fun setLowBatteryThreshold(ctx: Context, v: Int) {
+        get(ctx).edit().putInt("low_battery_threshold", v.coerceIn(5, 50)).apply()
+    }
+
+    /** 低电量时是否完全暂停非必要保活（熔断模式）。默认开。 */
+    fun lowPowerSuspendEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("low_power_suspend_enabled", true)
+
+    fun setLowPowerSuspendEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("low_power_suspend_enabled", v).apply()
+    }
+
+    // ---------- 隐私模式 ----------
+
+    /** 是否开启隐私模式（开启后暂停非必要屏幕内容读取）。默认关。 */
+    fun isPrivacyModeEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("privacy_mode_enabled", false)
+
+    fun setPrivacyModeEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("privacy_mode_enabled", v).apply()
+    }
+
+    // ---------- 今日统计（健康度仪表盘） ----------
+
+    private fun todayKey(suffix: String): String {
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        return "stat_${sdf.format(java.util.Date())}_$suffix"
+    }
+
+    /** 今日服务被杀次数。 */
+    fun todayKilledCount(ctx: Context): Int =
+        get(ctx).getInt(todayKey("killed"), 0)
+
+    fun bumpTodayKilled(ctx: Context) {
+        get(ctx).edit().putInt(todayKey("killed"), todayKilledCount(ctx) + 1).apply()
+    }
+
+    /** 今日服务成功拉起次数。 */
+    fun todayRestoredCount(ctx: Context): Int =
+        get(ctx).getInt(todayKey("restored"), 0)
+
+    fun bumpTodayRestored(ctx: Context) {
+        get(ctx).edit().putInt(todayKey("restored"), todayRestoredCount(ctx) + 1).apply()
+    }
+
+    /** 今日服务拉起失败次数。 */
+    fun todayRestoreFailedCount(ctx: Context): Int =
+        get(ctx).getInt(todayKey("restore_failed"), 0)
+
+    fun bumpTodayRestoreFailed(ctx: Context) {
+        get(ctx).edit().putInt(todayKey("restore_failed"), todayRestoreFailedCount(ctx) + 1).apply()
+    }
+
+    /** 清空今日统计数据。 */
+    fun clearTodayStats(ctx: Context) {
+        val keys = listOf("killed", "restored", "restore_failed")
+        val editor = get(ctx).edit()
+        keys.forEach { editor.remove(todayKey(it)) }
+        editor.apply()
+    }
 }

@@ -224,6 +224,53 @@ class HomeFragment : Fragment() {
         binding.tvStatProtected.text = Prefs.keepAliveApps(ctx).size.toString()
         binding.tvStatRelaunch.text = Prefs.relaunchCount(ctx).toString()
         binding.tvStatBlock.text = Prefs.notifBlockCount(ctx).toString()
+
+        // V3.3：健康度仪表盘
+        updateHealthDashboard(ctx)
+    }
+
+    /**
+     * V3.3：更新健康度仪表盘数据。
+     * 展示：健康评分、存活时长、今日被杀、拉起成功率、心跳模式、预估耗电。
+     */
+    private fun updateHealthDashboard(ctx: Context) {
+        val health = com.acsmanager.pro.health.HealthDashboardManager
+
+        // 健康评分
+        val score = health.getHealthScore(ctx)
+        binding.tvHealthScore.text = "$score"
+
+        // 健康等级
+        val level = health.getHealthLevel(ctx)
+        binding.tvHealthLevel.text = level
+
+        // 存活时长
+        binding.tvHealthUptime.text = health.getFormattedUptime()
+
+        // 今日被杀次数
+        binding.tvHealthKilled.text = health.getTodayKilledCount(ctx).toString()
+
+        // 拉起成功率
+        val successRate = health.getRestorationSuccessRate(ctx)
+        binding.tvHealthSuccess.text = "${(successRate * 100).toInt()}%"
+
+        // 当前心跳模式
+        val mode = com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.getCurrentMode()
+        val modeText = when (mode) {
+            com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.PERFORMANCE ->
+                getString(R.string.health_mode_performance)
+            com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.NORMAL ->
+                getString(R.string.health_mode_normal)
+            com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.LOW_POWER ->
+                getString(R.string.health_mode_low_power)
+            com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.SUSPENDED ->
+                getString(R.string.health_mode_suspended)
+        }
+        binding.tvHeartbeatMode.text = getString(R.string.health_heartbeat_mode, modeText)
+
+        // 预估耗电量
+        val drain = health.getEstimatedBatteryDrain(ctx)
+        binding.tvBatteryDrain.text = getString(R.string.health_battery_drain, drain)
     }
 
     private fun updateGuardDelayLabel() {
