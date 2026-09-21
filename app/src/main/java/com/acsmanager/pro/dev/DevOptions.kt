@@ -51,19 +51,13 @@ object DevOptions {
         // 常用调试项
         Option("always_finish_activities", Table.GLOBAL, Type.BOOL,
             R.string.dev_always_finish, R.string.dev_always_finish_desc, defBool = false),
-        Option("force_gpu_rendering", Table.GLOBAL, Type.BOOL,
-            R.string.dev_force_gpu, R.string.dev_force_gpu_desc, defBool = false),
-        Option("strict_mode", Table.GLOBAL, Type.BOOL,
-            R.string.dev_strict_mode, R.string.dev_strict_mode_desc, defBool = false),
         Option("show_touches", Table.SYSTEM, Type.BOOL,
             R.string.dev_show_touches, R.string.dev_show_touches_desc, defBool = false),
-        // 指针位置 / 布局边界 / GPU 呈现分析
+        // 指针位置 / 布局边界
         Option("pointer_location", Table.SYSTEM, Type.BOOL,
             R.string.dev_pointer_loc, R.string.dev_pointer_loc_desc, defBool = false),
         Option("debug_layout", Table.GLOBAL, Type.BOOL,
             R.string.dev_debug_layout, R.string.dev_debug_layout_desc, defBool = false),
-        Option("profile_hwui", Table.GLOBAL, Type.BOOL,
-            R.string.dev_profile_hwui, R.string.dev_profile_hwui_desc, defBool = false),
         // USB 调试 / 充电保持唤醒
         Option("adb_enabled", Table.GLOBAL, Type.BOOL,
             R.string.dev_adb_enabled, R.string.dev_adb_enabled_desc, defBool = true),
@@ -74,13 +68,9 @@ object DevOptions {
             R.string.dev_mock_loc, R.string.dev_mock_loc_desc, defBool = false),
         Option("accelerometer_rotation", Table.SYSTEM, Type.BOOL,
             R.string.dev_auto_rotate, R.string.dev_auto_rotate_desc, defBool = true),
-        // 指针速度 / 屏幕超时（秒）/ 字体缩放
+        // 指针速度
         Option("pointer_speed", Table.SYSTEM, Type.FLOAT,
-            R.string.dev_pointer_speed, R.string.dev_pointer_speed_desc, defFloat = 0.5f),
-        Option("screen_off_timeout", Table.SYSTEM, Type.FLOAT,
-            R.string.dev_screen_timeout, R.string.dev_screen_timeout_desc, defFloat = 30f),
-        Option("font_scale", Table.SYSTEM, Type.FLOAT,
-            R.string.dev_font_scale, R.string.dev_font_scale_desc, defFloat = 1.0f)
+            R.string.dev_pointer_speed, R.string.dev_pointer_speed_desc, defFloat = 0.5f)
     )
 
     // ---------- 读取 ----------

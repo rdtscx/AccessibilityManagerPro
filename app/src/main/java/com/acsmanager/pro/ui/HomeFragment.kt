@@ -236,10 +236,6 @@ class HomeFragment : Fragment() {
     private fun updateHealthDashboard(ctx: Context) {
         val health = com.acsmanager.pro.health.HealthDashboardManager
 
-        // 健康评分
-        val score = health.getHealthScore(ctx)
-        binding.tvHealthScore.text = "$score"
-
         // 健康等级
         val level = health.getHealthLevel(ctx)
         binding.tvHealthLevel.text = level

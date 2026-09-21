@@ -408,8 +408,8 @@
     <string name="permdetail_adb_hint">需 ADB 执行</string>
     <string name="permdetail_switch">权限开关</string>
 
-    <!-- 健康度仪表盘（V3.3） -->
-    <string name="health_dashboard_title">健康度仪表盘</string>
+    <!-- 仪表盘（V3.3） -->
+    <string name="health_dashboard_title">仪表盘</string>
     <string name="health_uptime">存活时长</string>
     <string name="health_killed_today">今日被杀</string>
     <string name="health_success_rate">拉起成功率</string>
