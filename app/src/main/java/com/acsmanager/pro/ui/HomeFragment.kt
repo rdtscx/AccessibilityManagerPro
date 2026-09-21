@@ -125,32 +125,68 @@ class HomeFragment : Fragment() {
             (activity as? MainActivity)?.openFragment(SettingsFragment())
         }
 
-        // V4.0：一键优化（整体 try-catch 保护，防止任何意外导致闪退）
+        // V5.0：一键优化（仅无障碍开启时可点击）
         binding.btnOneClickOptimize.setOnClickListener {
             try {
-                val actions = com.acsmanager.pro.health.HealthDiagnosis.autoOptimize(requireContext())
-                val msg = if (actions.isEmpty()) {
-                    getString(R.string.home_optimize_already)
-                } else {
-                    getString(R.string.home_optimize_success, actions.size) +
-                        "\n" + actions.joinToString("\n") { "• $it" }
-                }
-                Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show()
-                // refresh() 也包一层，防止状态更新时崩溃
-                try {
-                    refresh()
-                } catch (t: Throwable) {
-                    android.util.Log.w("HomeFragment", "refresh after optimize failed", t)
-                }
+                performOneClickOptimize()
             } catch (t: Throwable) {
                 android.util.Log.e("HomeFragment", "一键优化失败", t)
                 Toast.makeText(
                     requireContext(),
-                    "优化出错：${t.javaClass.simpleName}: ${t.message}",
+                    "优化出错：${t.message}",
                     Toast.LENGTH_LONG
                 ).show()
             }
         }
+    }
+
+    /**
+     * 一键优化：
+     * 1. 检查无障碍服务是否已开启
+     * 2. 优化本软件内部设置（自监控、看门狗、通知历史等）
+     * 3. 跳转自启动设置，通过无障碍自动开启本软件自启动
+     * 4. 跳转电池优化设置，通过无障碍自动将本软件设为不优化
+     */
+    private fun performOneClickOptimize() {
+        val ctx = requireContext()
+
+        // 第一步：检查无障碍服务
+        if (!selfAccessEnabled(ctx)) {
+            Toast.makeText(ctx, "请先开启无障碍服务", Toast.LENGTH_LONG).show()
+            startActivity(
+                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            return
+        }
+
+        // 第二步：优化本软件内部设置
+        val actions = com.acsmanager.pro.health.HealthDiagnosis.autoOptimize(ctx)
+
+        // 第三步：跳转自启动设置，无障碍自动操作
+        val romCompat = com.acsmanager.pro.compat.RomCompatibilityHelper
+        val romName = romCompat.detectRom().displayName
+
+        // 设置无障碍服务为"自动操作模式"
+        SelfAccessService.autoOptimizeMode = SelfAccessService.MODE_AUTO_START
+
+        val startedAutoStart = romCompat.openAutoStartSettings(ctx)
+        if (!startedAutoStart) {
+            Toast.makeText(ctx, "当前系统不支持自动跳转自启动设置，请手动开启", Toast.LENGTH_LONG).show()
+            SelfAccessService.autoOptimizeMode = SelfAccessService.MODE_NONE
+        } else {
+            Toast.makeText(ctx, "正在自动开启自启动...", Toast.LENGTH_SHORT).show()
+        }
+
+        // 显示结果
+        val resultMsg = if (actions.isNotEmpty()) {
+            "已优化内部设置 ${actions.size} 项"
+        } else {
+            "内部设置已是最佳"
+        }
+        Toast.makeText(ctx, "$resultMsg\nROM: $romName", Toast.LENGTH_LONG).show()
+
+        try { refresh() } catch (_: Throwable) {}
     }
 
     override fun onStart() {
@@ -199,6 +235,10 @@ class HomeFragment : Fragment() {
         binding.btnEnableSelfAccess.text = getString(
             if (enabled) R.string.self_access_on_short else R.string.home_enable
         )
+
+        // V5.0：一键优化按钮仅在无障碍开启时可点击
+        binding.btnOneClickOptimize.isEnabled = enabled
+        binding.btnOneClickOptimize.alpha = if (enabled) 1.0f else 0.5f
 
         // 自监控
         // 关键：先解绑再设值，防止程序回写触发监听导致意外启动/Toast（与 v1.3 开关循环同源问题）
