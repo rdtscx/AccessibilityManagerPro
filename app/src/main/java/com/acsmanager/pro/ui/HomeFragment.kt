@@ -53,10 +53,14 @@ class HomeFragment : Fragment() {
         }
 
         binding.btnEnableSelfAccess.setOnClickListener {
-            startActivity(
-                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
+            try {
+                startActivity(
+                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (t: Throwable) {
+                Toast.makeText(requireContext(), "打开设置失败", Toast.LENGTH_SHORT).show()
+            }
         }
 
         binding.switchSelfGuard.setOnCheckedChangeListener { _, checked ->
@@ -99,7 +103,11 @@ class HomeFragment : Fragment() {
         }
 
         binding.btnGuide.setOnClickListener {
-            startActivity(Intent(requireContext(), GuideActivity::class.java))
+            try {
+                startActivity(Intent(requireContext(), GuideActivity::class.java))
+            } catch (t: Throwable) {
+                Toast.makeText(requireContext(), "打开引导页失败", Toast.LENGTH_SHORT).show()
+            }
         }
 
         // Shizuku 状态细分 + 一键授权/启动（修复"Shizuku 不生效"：授权入口直达，无需跳转向导页）
@@ -107,12 +115,20 @@ class HomeFragment : Fragment() {
 
         // 应用无障碍权限总控（开关 + 锁定自动拉起）
         binding.btnAccessPermEntry.setOnClickListener {
-            startActivity(Intent(requireContext(), AccessibilityPermActivity::class.java))
+            try {
+                startActivity(Intent(requireContext(), AccessibilityPermActivity::class.java))
+            } catch (t: Throwable) {
+                Toast.makeText(requireContext(), "打开失败", Toast.LENGTH_SHORT).show()
+            }
         }
 
         // 权限管理器（类似权限狗，系统级权限修改）
         binding.btnPermMgrEntry.setOnClickListener {
-            startActivity(Intent(requireContext(), PermissionManagerActivity::class.java))
+            try {
+                startActivity(Intent(requireContext(), PermissionManagerActivity::class.java))
+            } catch (t: Throwable) {
+                Toast.makeText(requireContext(), "打开失败", Toast.LENGTH_SHORT).show()
+            }
         }
 
         binding.btnServicesEntry.setOnClickListener {

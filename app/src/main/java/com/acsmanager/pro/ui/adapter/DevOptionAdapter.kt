@@ -94,30 +94,37 @@ class DevOptionAdapter : RecyclerView.Adapter<DevOptionAdapter.Holder>() {
 
         /** 点击右侧数字弹出输入框，直接输入数值 */
         private fun showInputDialog(o: DevOptions.Option) {
-            val ctx = binding.root.context
-            val et = android.widget.EditText(ctx).apply {
-                inputType = android.text.InputType.TYPE_CLASS_NUMBER or
-                        android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-                setText(String.format(Locale.US, "%.2f", DevOptions.readFloat(ctx, o)))
-                setSelection(text.length)
-            }
-            android.app.AlertDialog.Builder(ctx)
-                .setTitle(ctx.getString(o.labelRes))
-                .setView(et)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    val input = et.text.toString().trim()
-                    val v = input.toFloatOrNull()
-                    if (v == null || v < 0f || v > 10f) {
-                        Toast.makeText(ctx, "请输入 0~10 之间的数字", Toast.LENGTH_SHORT).show()
-                        return@setPositiveButton
-                    }
-                    // 更新滑块位置
-                    binding.slider.progress = (v * 100).toInt()
-                    binding.tvValue.text = String.format(Locale.US, "%.2f", v)
-                    applyFloat(o, v)
+            try {
+                val ctx = binding.root.context
+                val et = android.widget.EditText(ctx).apply {
+                    inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                            android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                    setText(String.format(Locale.US, "%.2f", DevOptions.readFloat(ctx, o)))
+                    setSelection(text.length)
                 }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
+                android.app.AlertDialog.Builder(ctx)
+                    .setTitle(ctx.getString(o.labelRes))
+                    .setView(et)
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        try {
+                            val input = et.text.toString().trim()
+                            val v = input.toFloatOrNull()
+                            if (v == null || v < 0f || v > 10f) {
+                                Toast.makeText(ctx, "请输入 0~10 之间的数字", Toast.LENGTH_SHORT).show()
+                                return@setPositiveButton
+                            }
+                            binding.slider.progress = (v * 100).toInt()
+                            binding.tvValue.text = String.format(Locale.US, "%.2f", v)
+                            applyFloat(o, v)
+                        } catch (t: Throwable) {
+                            Toast.makeText(ctx, "输入失败", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            } catch (t: Throwable) {
+                Toast.makeText(binding.root.context, "打开输入框失败", Toast.LENGTH_SHORT).show()
+            }
         }
 
         fun bind(o: DevOptions.Option) {
