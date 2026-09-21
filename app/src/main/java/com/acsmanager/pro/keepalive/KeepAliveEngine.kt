@@ -85,18 +85,72 @@ object KeepAliveEngine {
     private var lastForegroundChangeMs = 0L
     private var lastBatteryPct = -1
 
+    /**
+     * 全局拉起冷却时间戳：上一次成功拉起任意保活应用的时间。
+     * 优化（V3）：多个应用同时被杀时，避免连续拉起造成屏幕闪烁——
+     * 全局冷却期内（默认 3 秒）只拉第一个，后续的等冷却结束再处理。
+     */
+    @Volatile
+    private var lastGlobalRelaunchMs = 0L
+    private const val GLOBAL_RELAUNCH_COOLDOWN_MS = 3_000L
+
     // ---------- 生命周期（由 SelfAccessService 驱动） ----------
 
     fun onAccessibilityConnected(svc: SelfAccessService) {
         service = svc
         reloadTargets(svc)
         handler.removeCallbacks(checkRunnable)
-        if (targets.isNotEmpty()) handler.postDelayed(checkRunnable, 5_000L)
+        if (targets.isNotEmpty()) {
+            // 优化（V3）：服务重连后立即探测当前前台应用，恢复 lastForegroundPkg 状态。
+            // 否则服务断开期间用户切换了前台，重连后我们不知道当前是谁，
+            // 如果正好是保活目标在前台，会漏跟踪——下次它被切走时无法触发检测。
+            handler.postDelayed({ detectCurrentForeground(svc) }, 1_000L)
+            handler.postDelayed(checkRunnable, 5_000L)
+        }
+    }
+
+    /**
+     * 服务重连后探测当前前台应用，恢复前台状态。
+     * 优先用 UsageStatsManager（精准），无权限时降级为不处理（等下一个窗口事件自然纠正）。
+     */
+    private fun detectCurrentForeground(ctx: Context) {
+        if (!hasUsageAccessCached(ctx)) return
+        try {
+            val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val end = System.currentTimeMillis()
+            val begin = end - 5_000L // 最近 5 秒的事件
+            val events = usm.queryEvents(begin, end)
+            val e = UsageEvents.Event()
+            var latestPkg: String? = null
+            var latestTs = 0L
+            while (events.hasNextEvent()) {
+                events.getNextEvent(e)
+                if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED && e.timeStamp > latestTs) {
+                    latestTs = e.timeStamp
+                    latestPkg = e.packageName
+                }
+            }
+            if (latestPkg != null) {
+                lastForegroundPkg = latestPkg
+                val now = SystemClock.elapsedRealtime()
+                targets[latestPkg]?.let {
+                    it.lastForegroundMs = now
+                    it.lastWindowMs = now
+                }
+                Log.i(TAG, "detected current foreground after reconnect: $latestPkg")
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "detect current foreground failed", t)
+        }
     }
 
     fun onAccessibilityDisconnected() {
         service = null
         handler.removeCallbacks(checkRunnable)
+        // 优化（V3）：服务断开时清理所有 pending 检查回调，避免重连后误触发
+        for (r in pendingRunnables.values) handler.removeCallbacks(r)
+        pendingRunnables.clear()
+        pendingGonePkgs.clear()
     }
 
     /** 熄屏休眠：暂停保活巡检，降低耗电。 */
@@ -134,10 +188,17 @@ object KeepAliveEngine {
             wanted.add(key)
             targets.getOrPut(key) { Target(pkg, cls) }
         }
+        // 移除不再需要保活的目标
         targets.keys.removeAll { it !in wanted }
+        // 优化（V3）：清理 pending 中已被移除的保活目标的检查回调
+        val wantedPkgs = targets.values.map { it.pkg }.toSet()
+        val gone = pendingGonePkgs.keys.filter { it !in wantedPkgs }
+        for (pkg in gone) {
+            pendingRunnables.remove(pkg)?.let { handler.removeCallbacks(it) }
+            pendingGonePkgs.remove(pkg)
+        }
         // 纯被动：不启动定时巡检，只等无障碍窗口事件
         handler.removeCallbacks(checkRunnable)
-        handler.removeCallbacks(triggerCheckRunnable)
     }
 
     /**
@@ -146,8 +207,14 @@ object KeepAliveEngine {
      *  - 目标 app 从前台被切走 → 延迟几秒后确认它没自己回来，没回来就拉起。
      * 不做定时巡检、不查 usage events、不查 pidof，零轮询开销。
      */
-    /** 被切走、待确认是否需要拉起的目标包名（纯被动：切走后延迟 8 秒再确认进程是否死了）。 */
-    @Volatile private var pendingGonePkg: String? = null
+    /**
+     * 被切走、待确认是否需要拉起的目标包名集合（纯被动：切走后延迟 8 秒再确认进程是否死了）。
+     * 优化（V3）：从单变量改为 Map，支持多目标同时待确认——
+     * 用户快速切换多个保活应用时，每个被切走的目标独立延迟检查，互不覆盖。
+     */
+    private val pendingGonePkgs = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    /** 每个待确认包名对应的检查 Runnable（用于精确移除旧回调，避免多个包共用一个 Runnable 互相干扰）。 */
+    private val pendingRunnables = java.util.concurrent.ConcurrentHashMap<String, Runnable>()
 
     fun onForeground(pkg: String, nowMs: Long) {
         val prev = lastForegroundPkg
@@ -158,10 +225,7 @@ object KeepAliveEngine {
             val prevTarget = targets.values.firstOrNull { it.pkg == prev }
             if (prevTarget != null) {
                 prevTarget.lastForegroundMs = nowMs
-                pendingGonePkg = prev
-                // 延迟 8 秒后检查进程是否真的死了（用户正常切走不会立刻拉回）
-                handler.removeCallbacks(triggerCheckRunnable)
-                handler.postDelayed(triggerCheckRunnable, 8_000L)
+                scheduleGoneCheck(prev, nowMs)
             }
         }
         targets[pkg]?.let {
@@ -170,23 +234,41 @@ object KeepAliveEngine {
         }
     }
 
+    /**
+     * 为某个被切走的保活目标调度延迟检查。
+     * 优化（V3）：每个包名独立 Runnable，互不干扰；
+     * 如果该包名之前已在 pending 中，先移除旧回调再重新计时（用户又切回来了）。
+     */
+    private fun scheduleGoneCheck(gonePkg: String, nowMs: Long) {
+        // 先移除该包名上一次的检查回调，避免重复调度
+        pendingRunnables.remove(gonePkg)?.let { handler.removeCallbacks(it) }
+        pendingGonePkgs[gonePkg] = nowMs
+        val r = Runnable {
+            pendingGonePkgs.remove(gonePkg)
+            pendingRunnables.remove(gonePkg)
+            confirmGone(gonePkg)
+        }
+        pendingRunnables[gonePkg] = r
+        handler.postDelayed(r, 8_000L)
+    }
+
     /** 被动触发：确认被切走的目标进程是否死了，死了才拉起。 */
-    private val triggerCheckRunnable = Runnable {
-        val ctx = service ?: return@Runnable
-        val gonePkg = pendingGonePkg ?: return@Runnable
-        pendingGonePkg = null
-        val target = targets.values.firstOrNull { it.pkg == gonePkg } ?: return@Runnable
+    private fun confirmGone(gonePkg: String) {
+        val ctx = service ?: return
+        val target = targets.values.firstOrNull { it.pkg == gonePkg } ?: return
         val now = SystemClock.elapsedRealtime()
         // 正在前台，不打扰
-        if (target.pkg == lastForegroundPkg) return@Runnable
+        if (target.pkg == lastForegroundPkg) return
         // 冷却期内不拉
-        if (now - target.lastRelaunchMs < Prefs.keepAliveCooldownMs(ctx)) return@Runnable
+        if (now - target.lastRelaunchMs < Prefs.keepAliveCooldownMs(ctx)) return
+        // 全局冷却：短时间内刚拉起过其他应用，跳过避免闪烁
+        if (now - lastGlobalRelaunchMs < GLOBAL_RELAUNCH_COOLDOWN_MS) return
         // 黑屏策略/低电量不允许
-        if (!policyAllows(ctx)) return@Runnable
+        if (!policyAllows(ctx)) return
         // 这 8 秒内如果它又有窗口事件（自己弹回来），不拉
-        if (now - target.lastWindowMs < 8_000L) return@Runnable
+        if (now - target.lastWindowMs < 8_000L) return
         // 查一次进程是否还活着：活着就不拉，死了才拉
-        if (processAlive(ctx, target.pkg)) return@Runnable
+        if (processAlive(ctx, target.pkg)) return
         relaunch(ctx, target)
     }
 
@@ -394,6 +476,8 @@ object KeepAliveEngine {
             }
             target.lastRelaunchMs = SystemClock.elapsedRealtime()
             target.relaunchCount++
+            // 更新全局拉起时间戳（用于多应用同时被杀时的冷却控制）
+            lastGlobalRelaunchMs = SystemClock.elapsedRealtime()
             Prefs.bumpRelaunch(ctx)
             Prefs.bumpTotalPull(ctx)
             refreshSelfGuardNotif(ctx)

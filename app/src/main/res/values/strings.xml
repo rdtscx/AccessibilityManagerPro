@@ -113,7 +113,7 @@
     <string name="guide_shizuku_grant">授权</string>
     <string name="guide_shizuku_ok">已连接并授权</string>
     <string name="guide_adb">ADB</string>
-    <string name="guide_adb_desc">电脑跑下面这一条，永久生效。</string>
+    <string name="guide_adb_desc">电脑跑下面这一条，自动授予全部权限并开启无障碍/通知监听/使用情况访问，永久生效，无需再手动开任何开关。</string>
     <string name="guide_adb_cmd">复制命令</string>
     <string name="guide_adb_copy_done">已复制</string>
     <string name="guide_adb_ok">已检测到授权</string>

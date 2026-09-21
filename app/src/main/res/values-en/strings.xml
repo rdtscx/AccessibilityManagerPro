@@ -113,7 +113,7 @@
     <string name="guide_shizuku_grant">Authorize</string>
     <string name="guide_shizuku_ok">Connected &amp; authorized</string>
     <string name="guide_adb">ADB</string>
-    <string name="guide_adb_desc">Run an adb command on a PC to grant WRITE_SECURE_SETTINGS, then this app can write switches directly.</string>
+    <string name="guide_adb_desc">Run this one adb command on a PC: grants all permissions and enables accessibility, notification listener, and usage access permanently. No manual toggles needed.</string>
     <string name="guide_adb_cmd">Copy command</string>
     <string name="guide_adb_copy_done">Copied</string>
     <string name="guide_adb_ok">Granted</string>

@@ -10,10 +10,11 @@ import com.acsmanager.pro.selfguard.SelfGuardService
 import com.acsmanager.pro.util.Prefs
 
 /**
- * 开机/更新后自动拉起看门狗与无障碍自监控。
+ * 开机/更新后自动拉起自监控服务。
  *
- * 优化：开机广播后延迟 5 秒启动服务，避免系统服务未就绪时启动失败；
- * MY_PACKAGE_REPLACED（应用更新）延迟 3 秒，给系统时间处理更新后的组件状态。
+ * 优化（V3）：WatchdogService 已完全合并入 SelfGuardService（ContentObserver 驱动更省电），
+ * 开机只需启动 SelfGuardService 一个前台服务，避免双服务并存浪费资源。
+ * 延迟 5 秒启动，等系统服务就绪；MY_PACKAGE_REPLACED 延迟 3 秒处理更新后组件状态。
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -34,14 +35,18 @@ class BootReceiver : BroadcastReceiver() {
         ) {
             val delay = if (action == Intent.ACTION_MY_PACKAGE_REPLACED) UPDATE_DELAY_MS else BOOT_DELAY_MS
             val appCtx = context.applicationContext
-            Log.i(TAG, "scheduled service start after ${delay}ms on $action")
+            Log.i(TAG, "scheduled self-guard start after ${delay}ms on $action")
             handler.postDelayed({
-                if (Prefs.isWatchdogEnabled(appCtx)) {
-                    Log.i(TAG, "restart watchdog on $action")
-                    WatchdogService.start(appCtx)
-                }
+                // 自监控已合并看门狗全部功能：ContentObserver 实时监听 + 兜底慢检
+                // 只需启动 SelfGuardService 一个前台服务，无需再启动 WatchdogService
                 if (Prefs.isSelfGuardEnabled(appCtx)) {
                     Log.i(TAG, "restart self guard on $action")
+                    SelfGuardService.start(appCtx)
+                }
+                // 兼容旧版用户开启了看门狗但没开自监控的情况：自动迁移到自监控
+                else if (Prefs.isWatchdogEnabled(appCtx)) {
+                    Log.i(TAG, "migrate watchdog -> self guard on $action")
+                    Prefs.setSelfGuardEnabled(appCtx, true)
                     SelfGuardService.start(appCtx)
                 }
             }, delay)

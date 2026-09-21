@@ -61,13 +61,27 @@ class GuideActivity : AppCompatActivity() {
             finish()
         }
 
-        // 一条命令搞定全部：授予 WRITE_SECURE_SETTINGS + 直接开启本应用无障碍服务
-        // 跑完这一条即可，永久生效，无需再去系统设置里手动开开关。
+        // 一条命令搞定全部功能所需权限：
+        //  1. WRITE_SECURE_SETTINGS —— 直写 Settings 无障碍/开发者选项
+        //  2. WRITE_SETTINGS —— 写 Settings.System（指针速度/字体缩放等）
+        //  3. POST_NOTIFICATIONS —— Android 13+ 通知权限
+        //  4. appops get_usage_stats —— 使用情况访问（保活引擎存活判定）
+        //  5. enabled_accessibility_services —— 本应用自无障碍服务
+        //  6. accessibility_enabled —— 无障碍总开关
+        //  7. enabled_notification_listeners —— 本应用通知监听服务（通知分级拦截）
+        //  8. notification_access_enabled —— 通知使用权总开关
+        // 跑完这一条即可，永久生效，无需再去系统设置里手动开任何开关。
         val component = "$packageName/com.acsmanager.pro.selfguard.SelfAccessService"
+        val notifComponent = "$packageName/com.acsmanager.pro.notif.NotifGateService"
         binding.adbCommand.text =
             "adb shell \"pm grant $packageName android.permission.WRITE_SECURE_SETTINGS && " +
+            "pm grant $packageName android.permission.WRITE_SETTINGS && " +
+            "pm grant $packageName android.permission.POST_NOTIFICATIONS && " +
+            "appops set $packageName android:get_usage_stats allow && " +
             "settings put secure enabled_accessibility_services $component && " +
-            "settings put secure accessibility_enabled 1\""
+            "settings put secure accessibility_enabled 1 && " +
+            "settings put secure enabled_notification_listeners $notifComponent && " +
+            "settings put secure notification_access_enabled 1\""
 
         binding.btnShizukuInstall.setOnClickListener {
             val url = if (Privilege.hasShizukuInstalled(this)) {

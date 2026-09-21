@@ -172,8 +172,6 @@ class SelfGuardService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        // 服务合并：自监控已覆盖看门狗的恢复范围，避免两个保活前台服务并存（减服务、省内存）
-        stopWatchdogIfRunning()
         createChannel()
         startAsForeground(buildNotification())
         if (!observerRegistered) {
@@ -214,16 +212,6 @@ class SelfGuardService : Service() {
         } else {
             @Suppress("DEPRECATION")
             startForeground(NOTIF_ID, n)
-        }
-    }
-
-    /** 看门狗与自监控功能合并：自监控运行时停掉看门狗，任意时刻最多一个保活前台服务。 */
-    private fun stopWatchdogIfRunning() {
-        try {
-            if (com.acsmanager.pro.watchdog.WatchdogService.isRunning(this)) {
-                stopService(Intent(this, com.acsmanager.pro.watchdog.WatchdogService::class.java))
-            }
-        } catch (t: Throwable) {
         }
     }
 
@@ -326,6 +314,102 @@ class SelfGuardService : Service() {
             Prefs.selfGuardDelayMs(this).coerceIn(100L, 30_000L).coerceAtMost(500L)
         }
         handler.postDelayed({ attemptRestore(pending, attempt = 1) }, delay)
+
+        // 优化（V3）：通知监听服务也纳入自监控——
+        // 用户配置了通知级别（说明在用通知分级功能），但通知监听服务被系统/用户关闭时，
+        // 自动恢复通知监听权限，保证通知分级拦截功能不静默失效。
+        restoreNotificationListenerIfNeeded()
+    }
+
+    /**
+     * 检查并恢复通知监听服务（NotifGateService）。
+     *
+     * 触发条件：
+     *  - 用户已配置过通知级别（Prefs.notifLevels 非空），说明在用通知功能；
+     *  - 且 NotifGateService 当前未被授权（系统关闭了通知使用权）；
+     *  - 且本应用具备写入 Settings.Secure 的通道（APP_GRANTED / ROOT / SHIZUKU）。
+     *
+     * 恢复动作：
+     *  - 把本应用的通知监听组件加入 enabled_notification_listeners；
+     *  - 把 notification_access_enabled 置 1（总开关）。
+     */
+    private fun restoreNotificationListenerIfNeeded() {
+        // 快速判断：用户根本没配置过任何通知级别 → 不需要恢复
+        val hasNotifConfig = Prefs.notifLevels(this).isNotEmpty() ||
+                Prefs.notifChannelLevel(this, "", "").let { false } // channel level 用空 pkg 查不到，跳过
+        if (!hasNotifConfig) return
+
+        // 通知监听服务已开启 → 无需恢复
+        if (com.acsmanager.pro.notif.NotifGateService.isEnabled(this)) return
+
+        // 无授权通道 → 无法静默恢复
+        val channel = Privilege.bestChannel(this)
+        if (channel == Privilege.Channel.NONE) return
+
+        Log.i(TAG, "notification listener disabled, restoring...")
+        EventLog.record(this, EventLog.TYPE_WARN, packageName, "notification listener off, auto-restoring")
+
+        scope.launch {
+            val restored = withContext(Dispatchers.IO) {
+                try {
+                    val notifComponent = "$packageName/com.acsmanager.pro.notif.NotifGateService"
+                    // 1. 读取当前 enabled_notification_listeners，追加本组件
+                    val current = android.provider.Settings.Secure.getString(
+                        contentResolver, "enabled_notification_listeners"
+                    ) ?: ""
+                    val list = current.split(':').map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+                    if (notifComponent in list) return@withContext true // 已在列表中，只是总开关关了
+                    list.add(notifComponent)
+                    val newVal = list.joinToString(":")
+
+                    // 2. 写入 enabled_notification_listeners
+                    val writeOk = when (channel) {
+                        Privilege.Channel.APP_GRANTED -> {
+                            android.provider.Settings.Secure.putString(
+                                contentResolver, "enabled_notification_listeners", newVal
+                            )
+                            true
+                        }
+                        Privilege.Channel.ROOT, Privilege.Channel.SHIZUKU -> {
+                            val out = Privilege.execShell(
+                                this@SelfGuardService,
+                                "settings", "put", "secure", "enabled_notification_listeners", newVal
+                            )
+                            out != null && !out.contains("error", ignoreCase = true)
+                        }
+                        else -> false
+                    }
+                    if (!writeOk) return@withContext false
+
+                    // 3. 打开通知使用权总开关
+                    val accessOk = when (channel) {
+                        Privilege.Channel.APP_GRANTED -> {
+                            android.provider.Settings.Secure.putInt(
+                                contentResolver, "notification_access_enabled", 1
+                            )
+                            true
+                        }
+                        Privilege.Channel.ROOT, Privilege.Channel.SHIZUKU -> {
+                            val out = Privilege.execShell(
+                                this@SelfGuardService,
+                                "settings", "put", "secure", "notification_access_enabled", "1"
+                            )
+                            out != null && !out.contains("error", ignoreCase = true)
+                        }
+                        else -> false
+                    }
+                    accessOk
+                } catch (t: Throwable) {
+                    Log.w(TAG, "restore notification listener failed", t)
+                    false
+                }
+            }
+            if (restored) {
+                EventLog.record(this@SelfGuardService, EventLog.TYPE_RESTORED, packageName, "notification listener restored")
+            } else {
+                EventLog.record(this@SelfGuardService, EventLog.TYPE_WARN, packageName, "notification listener restore failed")
+            }
+        }
     }
 
     /**
