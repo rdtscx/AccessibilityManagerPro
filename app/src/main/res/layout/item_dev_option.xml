@@ -56,7 +56,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:visibility="gone"
-        android:max="20" />
+        android:max="1000" />
 
     <TextView
         android:id="@+id/tv_status"
