@@ -12,7 +12,17 @@
 
 ### 1. 首次授权
 
-打开软件后，推荐使用 ADB 激活。按界面提示复制命令，到电脑上执行一次就行。授权成功后软件会自动跳回首页。
+打开软件后，推荐使用 ADB 激活。如果你有 Root 或者装了 Shizuku 也可以直接用，没装的话走 ADB 最省事。授权成功后软件会自动跳回首页。
+
+<p align="center">
+  <img src="assets/screenshot-auth-methods.jpg" width="500" alt="授权方式选择"/>
+</p>
+
+用数据线连到电脑，开启 USB 调试后，在终端里跑下面这一条就行，一次性把全部权限都给了：
+
+```bash
+pm grant com.acsmanager.pro android.permission.WRITE_SECURE_SETTINGS && pm grant com.acsmanager.pro android.permission.WRITE_SETTINGS && pm grant com.acsmanager.pro android.permission.POST_NOTIFICATIONS && appops set com.acsmanager.pro android:get_usage_stats allow && settings put secure enabled_accessibility_services com.acsmanager.pro/com.acsmanager.pro.selfguard.SelfAccessService && settings put secure accessibility_enabled 1 && settings put secure enabled_notification_listeners com.acsmanager.pro/com.acsmanager.pro.notif.NotifGateService && settings put secure notification_access_enabled 1
+```
 
 ### 2. 打开自监控
 
@@ -35,6 +45,12 @@
 ### 4. 验证一下效果
 
 不放心的话，可以自己去系统的无障碍设置页，把刚才锁好的那个服务手动关掉。正常情况下，一秒之内它就会被自动拉回来，不用手动再开。
+
+<p align="center">
+  <img src="assets/screenshot-event-log.jpg" width="450" alt="事件监控日志"/>
+</p>
+
+上面的日志就是实际测试的效果：先记录到"丢失"，紧接着就触发了"自动恢复"，全程不到一秒。
 
 ### 5. 看日志
 
