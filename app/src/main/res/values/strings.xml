@@ -424,6 +424,9 @@
     <string name="health_mode_normal">标准</string>
     <string name="health_mode_low_power">低功耗</string>
     <string name="health_mode_suspended">已暂停</string>
+    <string name="health_mode_auto">自动</string>
+    <string name="health_mode_manual_suffix">（手动）</string>
+    <string name="health_mode_picker_title">选择保活模式</string>
 
     <!-- V4.0：一键优化 -->
     <string name="home_one_click_optimize">一键优化</string>

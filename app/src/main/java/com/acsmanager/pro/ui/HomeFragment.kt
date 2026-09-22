@@ -141,6 +141,9 @@ class HomeFragment : Fragment() {
             (activity as? MainActivity)?.openFragment(SettingsFragment())
         }
 
+        // 仪表盘左下角"模式：xxx"：点击直接弹出模式选择，可手动切换/恢复自动
+        binding.tvHeartbeatMode.setOnClickListener { showHeartbeatModePicker() }
+
         // V5.0：一键优化（仅无障碍开启时可点击）
         binding.btnOneClickOptimize.setOnClickListener {
             try {
@@ -347,7 +350,13 @@ class HomeFragment : Fragment() {
             com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.SUSPENDED ->
                 getString(R.string.health_mode_suspended)
         }
-        binding.tvHeartbeatMode.text = getString(R.string.health_heartbeat_mode, modeText)
+        // 手动模式追加标记，让用户一眼看出这是锁定值而非自动计算结果
+        val manualSuffix = if (com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.isManualMode()) {
+            getString(R.string.health_mode_manual_suffix)
+        } else {
+            ""
+        }
+        binding.tvHeartbeatMode.text = getString(R.string.health_heartbeat_mode, "$modeText$manualSuffix")
 
         // 预估耗电量
         val drain = health.getEstimatedBatteryDrain(ctx)
@@ -359,6 +368,50 @@ class HomeFragment : Fragment() {
             R.string.self_guard_delay_value,
             Prefs.selfGuardDelayMs(requireContext()) / 1000f
         )
+    }
+
+    /**
+     * 弹出心跳模式选择对话框。
+     * 选项：自动（跟随设备状态）/ 高性能 / 标准 / 低功耗 / 已暂停。
+     * 选择后立即写入并刷新仪表盘。
+     */
+    private fun showHeartbeatModePicker() {
+        val ctx = requireContext()
+        val manager = com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager
+        val currentManual = manager.getManualMode()
+
+        // 选项列表：[自动, 高性能, 标准, 低功耗, 已暂停]
+        val labels = arrayOf(
+            getString(R.string.health_mode_auto),
+            getString(R.string.health_mode_performance),
+            getString(R.string.health_mode_normal),
+            getString(R.string.health_mode_low_power),
+            getString(R.string.health_mode_suspended)
+        )
+        // 默认选中项：自动 = 0；否则按当前手动模式定位
+        val checkedItem = when (currentManual) {
+            null -> 0
+            com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.PERFORMANCE -> 1
+            com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.NORMAL -> 2
+            com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.LOW_POWER -> 3
+            com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.SUSPENDED -> 4
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(ctx)
+            .setTitle(R.string.health_mode_picker_title)
+            .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
+                val newMode = when (which) {
+                    0 -> null   // 恢复自动
+                    1 -> com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.PERFORMANCE
+                    2 -> com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.NORMAL
+                    3 -> com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.LOW_POWER
+                    else -> com.acsmanager.pro.keepalive.AdaptiveHeartbeatManager.HeartbeatMode.SUSPENDED
+                }
+                manager.setManualMode(ctx, newMode)
+                refresh()
+                dialog.dismiss()
+            }
+            .show()
     }
 
     /** Shizuku 状态细分展示：未安装/未启动/已连接未授权/已授权，并显示对应操作按钮。 */

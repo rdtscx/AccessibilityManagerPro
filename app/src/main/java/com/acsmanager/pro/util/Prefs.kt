@@ -675,6 +675,20 @@ object Prefs {
         get(ctx).edit().putBoolean("low_power_suspend_enabled", v).apply()
     }
 
+    /**
+     * 用户手动锁定的心跳模式名称（HeartbeatMode.name）。
+     * null = 自动模式（跟随设备状态），默认。
+     */
+    fun manualHeartbeatMode(ctx: Context): String? =
+        get(ctx).getString("manual_heartbeat_mode", null)
+
+    fun setManualHeartbeatMode(ctx: Context, name: String?) {
+        get(ctx).edit().apply {
+            if (name == null) remove("manual_heartbeat_mode")
+            else putString("manual_heartbeat_mode", name)
+        }.apply()
+    }
+
     // ---------- 隐私模式 ----------
 
     /** 是否开启隐私模式（开启后暂停非必要屏幕内容读取）。默认关。 */

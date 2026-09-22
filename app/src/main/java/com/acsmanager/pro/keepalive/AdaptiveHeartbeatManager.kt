@@ -37,6 +37,14 @@ object AdaptiveHeartbeatManager {
     @Volatile
     private var currentMode: HeartbeatMode = HeartbeatMode.NORMAL
 
+    /**
+     * 用户手动锁定的心跳模式。
+     * null = 跟随设备状态自动切换（默认）；非 null = 强制使用该模式，忽略自动计算。
+     * 手动模式持久化到 Prefs，重启 App 后保留。
+     */
+    @Volatile
+    private var manualModeOverride: HeartbeatMode? = null
+
     @Volatile
     private var isCharging: Boolean = false
 
@@ -112,6 +120,10 @@ object AdaptiveHeartbeatManager {
 
         // 初始化状态
         updateInitialState(context)
+        // 从 Prefs 恢复用户上次手动锁定的模式
+        manualModeOverride = Prefs.manualHeartbeatMode(context)?.let { name ->
+            runCatching { HeartbeatMode.valueOf(name) }.getOrNull()
+        }
         recalculateMode(context)
 
         Log.i(TAG, "AdaptiveHeartbeatManager registered")
@@ -188,10 +200,19 @@ object AdaptiveHeartbeatManager {
 
     /**
      * 根据当前设备状态重新计算心跳模式。
-     * 优先级：熔断(低电量/过热) > 息屏低功耗 > 充电高性能 > 标准
+     * 优先级：手动锁定 > 熔断(低电量/过热) > 息屏低功耗 > 充电高性能 > 标准
      */
     private fun recalculateMode(context: Context) {
         val oldMode = currentMode
+
+        // 如果用户手动锁定了模式，直接使用手动值，忽略自动计算
+        manualModeOverride?.let { locked ->
+            if (currentMode != locked) {
+                currentMode = locked
+                notifyModeChanged(oldMode, locked)
+            }
+            return
+        }
 
         // 熔断条件：低电量 或 过热
         val threshold = Prefs.lowBatteryThreshold(context)
@@ -242,4 +263,23 @@ object AdaptiveHeartbeatManager {
 
     /** 是否低电量 */
     fun isLowBattery(): Boolean = isLowBattery
+
+    // ---------- 手动模式锁定 ----------
+
+    /**
+     * 设置手动锁定的心跳模式。
+     * @param mode 要锁定的模式；传 null 表示恢复自动模式（跟随设备状态）。
+     */
+    fun setManualMode(context: Context, mode: HeartbeatMode?) {
+        manualModeOverride = mode
+        Prefs.setManualHeartbeatMode(context, mode?.name)
+        // 立即重新计算并通知监听器
+        recalculateMode(context)
+    }
+
+    /** 获取当前手动锁定的模式；null 表示自动模式。 */
+    fun getManualMode(): HeartbeatMode? = manualModeOverride
+
+    /** 是否处于手动模式（非自动）。 */
+    fun isManualMode(): Boolean = manualModeOverride != null
 }
