@@ -275,7 +275,9 @@ object KeepAliveEngine {
         relaunch(ctx, target)
     }
 
-    /** 轻量进程存活检查：root pidof 优先，否则 runningAppProcesses；查不到视为死了。 */
+    /** 轻量进程存活检查：root pidof 优先，否则 runningAppProcesses；查不到视为死了。
+     *  5.2.1：API 31+ runningAppProcesses 只能看到本应用进程，补一条 UsageStats 判定——
+     *  有使用情况访问且近一个周期内有 RESUME 事件则视为存活，避免把后台保活应用误判为已死而误拉起。 */
     private fun processAlive(ctx: Context, pkg: String): Boolean {
         // root / shizuku pidof
         if (Privilege.bestChannel(ctx) != Privilege.Channel.NONE) {
@@ -290,6 +292,24 @@ object KeepAliveEngine {
                     it.processName == pkg || it.processName.startsWith("$pkg:")
                 } == true
             } catch (t: Throwable) { false }
+        }
+        // API 31+：有使用情况访问时，近 2 倍巡检窗口内有 RESUME 事件视为存活（精确、省电）
+        if (hasUsageAccessCached(ctx)) {
+            try {
+                val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+                val end = System.currentTimeMillis()
+                val begin = end - 2 * Prefs.keepAliveIntervalMs(ctx).coerceAtLeast(30_000L)
+                val events = usm.queryEvents(begin, end)
+                val e = UsageEvents.Event()
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(e)
+                    if (e.packageName == pkg && e.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                        return true
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "processAlive usage query failed", t)
+            }
         }
         return false
     }

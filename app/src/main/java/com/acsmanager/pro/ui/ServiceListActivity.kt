@@ -38,11 +38,16 @@ class ServiceListActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         pkg = intent.getStringExtra(EXTRA_PACKAGE) ?: run { finish(); return }
+
+        // 主题为 NoActionBar，必须用布局内的 MaterialToolbar 作为 ActionBar，
+        // 否则 supportActionBar 恒为 null——此前二级页没有标题栏/返回键，视觉上与首页突兀。
+        setSupportActionBar(binding.toolbar)
         supportActionBar?.apply {
             setDisplayHomeAsUpEnabled(true)
             title = getString(R.string.svclist_title)
             subtitle = pkg
         }
+        binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
 
         binding.recycler.layoutManager = LinearLayoutManager(this)
         binding.recycler.adapter = adapter

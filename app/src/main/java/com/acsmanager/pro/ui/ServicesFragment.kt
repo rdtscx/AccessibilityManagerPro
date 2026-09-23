@@ -98,6 +98,8 @@ class ServicesFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        // 二级页嵌套首页时同步工具栏标题，返回首页后由 HomeFragment.onResume 恢复应用名
+        requireActivity().title = getString(R.string.tab_services)
         refreshStatus()
         load()
     }

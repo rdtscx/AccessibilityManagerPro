@@ -29,6 +29,18 @@ class SelfAccessService : AccessibilityService() {
         super.onServiceConnected()
         KeepAliveEngine.onAccessibilityConnected(this)
         reloadTargetPkgs()
+        // 自动化增强（5.2.1）：无障碍服务被系统/用户重新打开时，若用户已开启自监控但
+        // SelfGuardService 未运行（如被系统杀后未自启），立即补拉起——保证"被关即拉起"的
+        // 自监控闭环不出现空窗。无授权通道时 start 会内部静默失败，不影响主流程。
+        try {
+            if (com.acsmanager.pro.util.Prefs.isSelfGuardEnabled(this) &&
+                !SelfGuardService.isRunning(this)
+            ) {
+                SelfGuardService.start(this)
+            }
+        } catch (t: Throwable) {
+            android.util.Log.w("SelfAccessService", "self-heal self guard failed", t)
+        }
     }
 
     fun reloadTargetPkgs() {

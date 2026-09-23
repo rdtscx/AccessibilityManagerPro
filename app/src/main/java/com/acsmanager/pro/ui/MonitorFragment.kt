@@ -69,6 +69,7 @@ class MonitorFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        requireActivity().title = getString(R.string.monitor_title)
         load()
     }
 
