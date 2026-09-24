@@ -246,9 +246,31 @@ class HomeFragment : Fragment() {
         val ctx = requireContext()
 
         // V5.2.2：授权通道联动——检测到任一授权通道可用且自监控未开启时自动开启。
-        // 放在刷新最前，保证用户从系统授权页返回首页后开关状态即时同步为"已开启"。
+        // V6.0.0：改为异步执行（通道探测含 Root su 探测，主线程执行会卡死/ANR），
+        // 完成后在主线程回调刷新开关状态，保证用户从系统授权页返回后 UI 即时同步。
         try {
-            SelfGuardService.enableIfChannelReady(ctx)
+            SelfGuardService.enableIfChannelReady(ctx) {
+                if (isAdded && _binding != null) {
+                    binding.switchSelfGuard.setOnCheckedChangeListener(null)
+                    binding.switchSelfGuard.isChecked = Prefs.isSelfGuardEnabled(requireContext())
+                    binding.switchSelfGuard.setOnCheckedChangeListener { _, checked ->
+                        val c = requireContext()
+                        Prefs.setSelfGuardEnabled(c, checked)
+                        if (checked) {
+                            if (Build.VERSION.SDK_INT >= 33 &&
+                                ContextCompat.checkSelfPermission(c, android.Manifest.permission.POST_NOTIFICATIONS)
+                                != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            SelfGuardService.start(c)
+                            Toast.makeText(c, R.string.self_guard_enabled_toast, Toast.LENGTH_SHORT).show()
+                        } else {
+                            SelfGuardService.stop(c)
+                        }
+                    }
+                }
+            }
         } catch (t: Throwable) {
             android.util.Log.w("HomeFragment", "auto enable self guard failed", t)
         }

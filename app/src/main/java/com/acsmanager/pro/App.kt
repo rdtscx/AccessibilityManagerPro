@@ -13,6 +13,7 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        installCrashLogger()
         applyThemeMode()
         initShizukuListeners()
         // V5.2.2：启动后检测授权通道（ADB 授予 / Root / Shizuku），任一可用即自动开启自监控低耗电。
@@ -24,6 +25,76 @@ class App : Application() {
                 Log.w(TAG, "auto enable self guard on app start failed", t)
             }
         }, 1000L)
+    }
+
+    /**
+     * 全局崩溃日志捕获（V6.0.0）。
+     *
+     * 为什么这么做：无障碍/保活类工具在后台常驻，闪退时用户难以描述复现步骤，
+     * 之前只能靠猜测排查。现在把未捕获异常（含线程名、堆栈、设备信息）写入
+     * 本地文件 crash_log.txt（应用私有目录，不联网、不采集），下次闪退后把该文件
+     * 发出来即可精确定位崩溃点。
+     *
+     * 实现要点：
+     *  - 链式代理默认 Handler：先写日志再走系统默认处理（进程照常崩溃，行为不变）；
+     *  - 日志按时间戳追加，最多保留 5 条崩溃记录，防止无限增长；
+     *  - 写盘放后台线程，不阻塞崩溃流程。
+     */
+    private fun installCrashLogger() {
+        try {
+            val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+                try {
+                    writeCrashLog(thread, throwable)
+                } catch (t: Throwable) {
+                }
+                defaultHandler?.uncaughtException(thread, throwable)
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "install crash logger failed", t)
+        }
+    }
+
+    private fun writeCrashLog(thread: Thread, throwable: Throwable) {
+        Thread {
+            try {
+                val sb = StringBuilder()
+                sb.append("=== Crash @ ").append(java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date()))
+                    .append(" | Thread: ").append(thread.name)
+                    .append(" | Android ").append(android.os.Build.VERSION.RELEASE)
+                    .append(" (API ").append(android.os.Build.VERSION.SDK_INT).append(")")
+                    .append(" | ").append(android.os.Build.MANUFACTURER).append(' ').append(android.os.Build.MODEL)
+                    .append(" | ver ").append(BuildConfig.VERSION_NAME).append(" (").append(BuildConfig.VERSION_CODE).append(")\n")
+                val sw = java.io.StringWriter()
+                throwable.printStackTrace(java.io.PrintWriter(sw))
+                sb.append(sw.toString()).append('\n')
+                val dir = filesDir
+                val file = java.io.File(dir, "crash_log.txt")
+                // 保留最近 5 条崩溃记录：旧日志中超过 5 条的头部丢弃，避免文件无限增长
+                val kept = if (file.exists()) {
+                    try {
+                        val lines = file.readLines().toMutableList()
+                        val sep = "=== Crash"
+                        val indexes = mutableListOf<Int>()
+                        for (i in lines.indices) {
+                            if (lines[i].startsWith(sep)) indexes.add(i)
+                        }
+                        // 只保留最后 5 条记录起始位置之后的内容
+                        val start = if (indexes.size > 5) indexes[indexes.size - 5] else 0
+                        lines.subList(start, lines.size).joinToString("\n").let { if (it.isEmpty()) "" else it + "\n" }
+                    } catch (t: Throwable) {
+                        ""
+                    }
+                } else {
+                    ""
+                }
+                file.writeText(kept + sb.toString())
+            } catch (t: Throwable) {
+            }
+        }.apply {
+            isDaemon = true
+            name = "acs-crash-logger"
+        }.start()
     }
 
     /**

@@ -58,6 +58,9 @@ class SelfGuardService : Service() {
         const val ACTION_START = "com.acsmanager.pro.action.SELFGUARD_START"
         const val ACTION_STOP = "com.acsmanager.pro.action.SELFGUARD_STOP"
 
+        /** 主线程 Handler（供静态方法在主线程启动服务 / 回调 UI）。 */
+        private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
         /** 本应用自身正在执行开关操作的服务集合（冷却期内忽略 ContentObserver 回调，避免误报丢失）。 */
         private val selfOperating: MutableSet<String> =
             java.util.Collections.synchronizedSet(mutableSetOf<String>())
@@ -104,20 +107,50 @@ class SelfGuardService : Service() {
          *  - 无感：自动开启不弹 Toast、不申请通知权限，纯后台静默完成；
          *  - 无通道时不开启：自监控的自动拉起依赖授权通道，无通道时开启只会徒增
          *    常驻通知与无意义的"请手动开启"引导，故仅在通道就绪后联动。
+         *
+         * 异步化（V6.0.0）：Root 探测会 fork su 进程（最坏阻塞数秒），若在主线程执行
+         * 会导致应用卡死甚至 ANR 闪退。现改为后台线程探测通道、主线程启动服务，
+         * 调用方不阻塞；[onDone] 在主线程回调（可为 null），便于 UI 刷新同步开关状态。
          */
-        fun enableIfChannelReady(ctx: Context) {
+        fun enableIfChannelReady(ctx: Context, onDone: (() -> Unit)? = null) {
             try {
-                if (Prefs.isSelfGuardEnabled(ctx)) return
-                if (Prefs.isAutoSelfGuardDisabledByUser(ctx)) return
-                val channel = Privilege.bestChannel(ctx)
-                if (channel == Privilege.Channel.NONE) return
-                Log.i(TAG, "auto enable self guard: channel=$channel")
-                Prefs.setAutoSelfGuardDisabledByUser(ctx, false)
-                Prefs.setSelfGuardEnabled(ctx, true)
-                start(ctx)
-                EventLog.record(ctx, EventLog.TYPE_RESTORED, ctx.packageName, "auto enabled self guard via $channel")
+                // 已开启则直接回调（幂等，避免无谓的后台探测）
+                if (Prefs.isSelfGuardEnabled(ctx)) {
+                    onDone?.invoke()
+                    return
+                }
+                // 用户手动关闭过：不再自动开启，直接回调
+                if (Prefs.isAutoSelfGuardDisabledByUser(ctx)) {
+                    onDone?.invoke()
+                    return
+                }
+                Thread {
+                    try {
+                        // 通道探测（含 Root su 探测，可能耗时数秒）放后台线程
+                        val channel = Privilege.bestChannel(ctx)
+                        if (channel == Privilege.Channel.NONE) {
+                            mainHandler.post { onDone?.invoke() }
+                            return@Thread
+                        }
+                        Log.i(TAG, "auto enable self guard: channel=$channel")
+                        Prefs.setAutoSelfGuardDisabledByUser(ctx, false)
+                        Prefs.setSelfGuardEnabled(ctx, true)
+                        EventLog.record(ctx, EventLog.TYPE_RESTORED, ctx.packageName, "auto enabled self guard via $channel")
+                        mainHandler.post {
+                            start(ctx)
+                            onDone?.invoke()
+                        }
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "auto enable self guard failed", t)
+                        mainHandler.post { onDone?.invoke() }
+                    }
+                }.apply {
+                    isDaemon = true
+                    name = "acs-channel-enabler"
+                }.start()
             } catch (t: Throwable) {
                 Log.w(TAG, "auto enable self guard failed", t)
+                onDone?.invoke()
             }
         }
 

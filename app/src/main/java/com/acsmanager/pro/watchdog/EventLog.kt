@@ -55,18 +55,101 @@ object EventLog {
         }
     }
 
+    // ---------- 异步合并写（V6.0.0） ----------
+    // 修复闪退：事件日志在多处被高频写入（自监控主线程、看门狗协程、通知监听系统 Binder
+    // 线程），原先每次 record 都在调用线程同步执行 SQLite 插入 + COUNT + DELETE——
+    // 主线程被数据库 IO 阻塞（ANR 风险），多线程并发写 SQLite 还会触发"database is locked"。
+    // 现改为：record 只把事件写入内存缓冲并立即返回；唯一写线程把缓冲批量落库，
+    // 队列中永远只有一条写任务，调用线程零 IO、数据库零竞争。
+
+    /** 内存写缓冲：异步写线程尚未落库的事件。 */
+    private val pendingEvents = java.util.concurrent.LinkedBlockingQueue<ContentValues>()
+
+    /** 是否有写任务已在执行器队列中（防止重复提交，保证合并写）。 */
+    @Volatile
+    private var writerScheduled = false
+
+    /** 单线程写执行器：串行化所有数据库写入。 */
+    private val writeExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "acs-event-writer").apply { isDaemon = true }
+    }
+
+    private fun scheduleWrite() {
+        synchronized(this) {
+            if (writerScheduled) return
+            writerScheduled = true
+        }
+        writeExecutor.execute {
+            try {
+                flushPending()
+            } finally {
+                writerScheduled = false
+                // 写线程执行期间又有新事件进入缓冲：立即补一次落库，避免事件滞留
+                if (pendingEvents.isNotEmpty()) {
+                    synchronized(this) {
+                        if (writerScheduled) return@execute
+                        writerScheduled = true
+                    }
+                    writeExecutor.execute {
+                        try {
+                            flushPending()
+                        } finally {
+                            writerScheduled = false
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** 一次性把缓冲中的全部事件写入数据库（单线程调用，无并发竞争）。 */
+    private fun flushPending() {
+        if (pendingEvents.isEmpty()) return
+        val batch = ArrayList<ContentValues>(pendingEvents.size)
+        pendingEvents.drainTo(batch)
+        if (batch.isEmpty()) return
+        val appCtx = writeCtx ?: return
+        try {
+            val database = db(appCtx).writableDatabase
+            database.beginTransaction()
+            try {
+                for (cv in batch) {
+                    database.insert("events", null, cv)
+                }
+                database.setTransactionSuccessful()
+            } finally {
+                database.endTransaction()
+            }
+            // 超过上限时清理最旧的记录（批量写只清理一次，避免每条事件都 COUNT/DELETE）
+            try {
+                if (database.compileStatement("SELECT COUNT(*) FROM events").simpleQueryForLong() > MAX_RECORDS) {
+                    database.execSQL(
+                        "DELETE FROM events WHERE _id IN (SELECT _id FROM events ORDER BY ts ASC LIMIT 100)"
+                    )
+                }
+            } catch (t: Throwable) {
+            }
+        } catch (t: Throwable) {
+            // 落库失败（如数据库被外部删除）：丢弃本批，避免无限重试堆积内存
+        }
+    }
+
+    /** 写线程使用的 Context（进程级缓存，避免每次取 applicationContext）。 */
+    @Volatile
+    private var writeCtx: Context? = null
+
     /**
      * 记录事件（带级别）。
      * 隐私模式下 DEBUG 级别日志不记录。
+     * 只入内存缓冲，立即返回，不阻塞调用线程。
      */
     fun record(ctx: Context, type: String, pkg: String, detail: String, level: String = LEVEL_INFO) {
         // 隐私模式下不记录 DEBUG 级别日志
         if (level == LEVEL_DEBUG && Prefs.isPrivacyModeEnabled(ctx)) {
             return
         }
-
         try {
-            val database = db(ctx).writableDatabase
+            if (writeCtx == null) writeCtx = ctx.applicationContext
             val cv = ContentValues().apply {
                 put("ts", System.currentTimeMillis())
                 put("type", type)
@@ -74,13 +157,8 @@ object EventLog {
                 put("detail", detail)
                 put("level", level)
             }
-            database.insert("events", null, cv)
-            // 超过上限时清理最旧的记录（异步触发，不阻塞当前写入）
-            if (database.compileStatement("SELECT COUNT(*) FROM events").simpleQueryForLong() > MAX_RECORDS) {
-                database.execSQL(
-                    "DELETE FROM events WHERE _id IN (SELECT _id FROM events ORDER BY ts ASC LIMIT 100)"
-                )
-            }
+            pendingEvents.offer(cv)
+            scheduleWrite()
         } catch (t: Throwable) {
             // 日志失败不影响主流程
         }

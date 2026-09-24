@@ -335,16 +335,49 @@ object Prefs {
 
     private const val KEY_NOTIF_LEVELS = "notif_levels"
     private const val KEY_NOTIF_HISTORY = "notif_history"
+    private const val KEY_NOTIF_CHANNEL_LEVELS = "notif_channel_levels"
+    private const val KEY_NOTIF_HIDDEN_CHANNELS = "notif_hidden_channels"
 
-    /** 获取指定包名的通知调控等级（0-5，默认 3 = 标准）。 */
+    // V6.0.0：进程内缓存——通知监听服务在每条通知的高频路径上多次读取等级/隐藏渠道，
+    // 原先每次都全量解析 SharedPreferences 中的大 JSON 字符串，产生大量临时对象（GC 压力）。
+    // 缓存以"原始字符串是否变化"为失效依据：SharedPreferences 写入后 raw 变化即重新解析。
+
+    @Volatile
+    private var notifLevelsCacheRaw: String? = null
+    private var notifLevelsCacheMap: Map<String, Int>? = null
+
+    @Volatile
+    private var notifChannelLevelsCacheRaw: String? = null
+    private var notifChannelLevelsCacheMap: Map<String, Int>? = null
+
+    @Volatile
+    private var notifHiddenChannelsCacheRaw: Set<String>? = null
+    private var notifHiddenChannelsCacheSet: Set<String>? = null
+
+    /** 获取指定包名的通知调控等级（0-5，默认 3 = 标准）。带进程内缓存。 */
     fun notifLevel(ctx: Context, pkg: String): Int {
         val raw = get(ctx).getString(KEY_NOTIF_LEVELS, null) ?: return 3
-        return try {
-            val o = JSONObject(raw)
-            o.optInt(pkg, 3)
-        } catch (t: Throwable) {
-            3
+        val map = synchronized(this) {
+            if (notifLevelsCacheRaw != raw) {
+                notifLevelsCacheRaw = raw
+                notifLevelsCacheMap = parseLevelMap(raw)
+            }
+            notifLevelsCacheMap
+        } ?: return 3
+        return map[pkg] ?: 3
+    }
+
+    private fun parseLevelMap(raw: String): Map<String, Int>? = try {
+        val o = JSONObject(raw)
+        val m = HashMap<String, Int>()
+        val it = o.keys()
+        while (it.hasNext()) {
+            val k = it.next()
+            m[k] = o.optInt(k, 3)
         }
+        m
+    } catch (t: Throwable) {
+        null
     }
 
     fun setNotifLevel(ctx: Context, pkg: String, level: Int) {
@@ -370,17 +403,12 @@ object Prefs {
 
     fun notifLevels(ctx: Context): Map<String, Int> {
         val raw = get(ctx).getString(KEY_NOTIF_LEVELS, null) ?: return emptyMap()
-        return try {
-            val o = JSONObject(raw)
-            val m = mutableMapOf<String, Int>()
-            val it = o.keys()
-            while (it.hasNext()) {
-                val k = it.next()
-                m[k] = o.optInt(k, 3)
+        return synchronized(this) {
+            if (notifLevelsCacheRaw != raw) {
+                notifLevelsCacheRaw = raw
+                notifLevelsCacheMap = parseLevelMap(raw)
             }
-            m
-        } catch (t: Throwable) {
-            emptyMap()
+            notifLevelsCacheMap ?: emptyMap()
         }
     }
 
@@ -435,29 +463,42 @@ object Prefs {
 
     // ---------- 单渠道级别 & 隐藏渠道（通知历史二级页用） ----------
 
-    /** 单渠道级别：key = "pkg/channelId"，value = 0~5。优先于应用整体级别。 */
+    /** 单渠道级别：key = "pkg/channelId"，value = 0~5。优先于应用整体级别。带进程内缓存。 */
     fun notifChannelLevel(ctx: Context, pkg: String, channelId: String): Int {
         val key = "$pkg/$channelId"
-        val raw = get(ctx).getString("notif_channel_levels", "{}") ?: "{}"
-        return try {
-            JSONObject(raw).optInt(key, -1)
-        } catch (t: Throwable) { -1 }
+        val raw = get(ctx).getString(KEY_NOTIF_CHANNEL_LEVELS, "{}") ?: "{}"
+        val map = synchronized(this) {
+            if (notifChannelLevelsCacheRaw != raw) {
+                notifChannelLevelsCacheRaw = raw
+                notifChannelLevelsCacheMap = parseLevelMap(raw)
+            }
+            notifChannelLevelsCacheMap
+        } ?: return -1
+        return map[key] ?: -1
     }
 
     fun setNotifChannelLevel(ctx: Context, pkg: String, channelId: String, level: Int) {
         val key = "$pkg/$channelId"
-        val raw = get(ctx).getString("notif_channel_levels", "{}") ?: "{}"
+        val raw = get(ctx).getString(KEY_NOTIF_CHANNEL_LEVELS, "{}") ?: "{}"
         try {
             val o = JSONObject(raw)
             o.put(key, level.coerceIn(0, 5))
-            get(ctx).edit().putString("notif_channel_levels", o.toString()).apply()
+            get(ctx).edit().putString(KEY_NOTIF_CHANNEL_LEVELS, o.toString()).apply()
         } catch (t: Throwable) {
         }
     }
 
-    /** 隐藏渠道集合：遇到该 pkg/channelId 的通知直接取消不显示。 */
-    fun notifHiddenChannels(ctx: Context): Set<String> =
-        get(ctx).getStringSet("notif_hidden_channels", emptySet()) ?: emptySet()
+    /** 隐藏渠道集合：遇到该 pkg/channelId 的通知直接取消不显示。带进程内缓存。 */
+    fun notifHiddenChannels(ctx: Context): Set<String> {
+        val raw = get(ctx).getStringSet(KEY_NOTIF_HIDDEN_CHANNELS, emptySet()) ?: emptySet()
+        return synchronized(this) {
+            if (notifHiddenChannelsCacheRaw != raw) {
+                notifHiddenChannelsCacheRaw = raw
+                notifHiddenChannelsCacheSet = raw.toSet()
+            }
+            notifHiddenChannelsCacheSet ?: emptySet()
+        }
+    }
 
     fun isChannelHidden(ctx: Context, pkg: String, channelId: String): Boolean =
         "$pkg/$channelId" in notifHiddenChannels(ctx)
@@ -466,7 +507,7 @@ object Prefs {
         val set = notifHiddenChannels(ctx).toMutableSet()
         val key = "$pkg/$channelId"
         if (hidden) set.add(key) else set.remove(key)
-        get(ctx).edit().putStringSet("notif_hidden_channels", set).apply()
+        get(ctx).edit().putStringSet(KEY_NOTIF_HIDDEN_CHANNELS, set).apply()
     }
 
     // ---------- 完整通知历史（二级页列表用） ----------
