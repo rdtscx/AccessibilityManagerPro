@@ -71,6 +71,7 @@ object Prefs {
         // 自监控
         o.put("self_guard_enabled", isSelfGuardEnabled(ctx))
         o.put("self_guard_delay", selfGuardDelayMs(ctx))
+        o.put("user_disabled_auto_self_guard", isAutoSelfGuardDisabledByUser(ctx))
         // 应用保活
         o.put("keepalive_apps", setToJson(keepAliveApps(ctx)))
         o.put("keepalive_interval", keepAliveIntervalMs(ctx))
@@ -115,6 +116,7 @@ object Prefs {
             if (ver >= 2) {
                 setSelfGuardEnabled(ctx, o.optBoolean("self_guard_enabled", false))
                 setSelfGuardDelayMs(ctx, o.optLong("self_guard_delay", 1000L))
+                setAutoSelfGuardDisabledByUser(ctx, o.optBoolean("user_disabled_auto_self_guard", false))
                 setKeepAliveApps(ctx, jsonToSet(o.optJSONObject("keepalive_apps")))
                 setKeepAliveIntervalMs(ctx, o.optLong("keepalive_interval", 30_000L))
                 setKeepAliveScreenOffOnly(ctx, o.optBoolean("keepalive_screenoff_only", true))
@@ -173,6 +175,21 @@ object Prefs {
 
     fun setSelfGuardDelayMs(ctx: Context, v: Long) {
         get(ctx).edit().putLong("self_guard_delay", v.coerceIn(100L, 30_000L)).apply()
+    }
+
+    // ---------- 授权通道自动开启自监控（V5.2.2） ----------
+
+    /**
+     * 用户是否手动关闭过自监控（V5.2.2 自动开启的豁免标记）。
+     * 默认 false：检测到任一授权通道（ADB 授予 / Root / Shizuku）可用时，
+     * 自动开启"无障碍自监控（低耗电）"，无需用户操作。
+     * 用户在界面手动关闭开关时置 true，此后不再被自动开启，尊重用户选择。
+     */
+    fun isAutoSelfGuardDisabledByUser(ctx: Context): Boolean =
+        get(ctx).getBoolean("user_disabled_auto_self_guard", false)
+
+    fun setAutoSelfGuardDisabledByUser(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("user_disabled_auto_self_guard", v).apply()
     }
 
     // ---------- 应用保活 ----------

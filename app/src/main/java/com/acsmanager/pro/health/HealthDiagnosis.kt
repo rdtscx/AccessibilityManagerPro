@@ -192,6 +192,8 @@ object HealthDiagnosis {
         try {
             if (!com.acsmanager.pro.util.Prefs.isSelfGuardEnabled(ctx)) {
                 com.acsmanager.pro.util.Prefs.setSelfGuardEnabled(ctx, true)
+                // 一键优化视为用户主动开启：清除"禁用自动开启"豁免标记，恢复通道联动
+                com.acsmanager.pro.util.Prefs.setAutoSelfGuardDisabledByUser(ctx, false)
                 SelfGuardService.start(ctx)
                 actions.add("已开启自监控保活")
             }

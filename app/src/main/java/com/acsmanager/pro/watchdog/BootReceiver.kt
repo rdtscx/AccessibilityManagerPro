@@ -37,6 +37,13 @@ class BootReceiver : BroadcastReceiver() {
             val appCtx = context.applicationContext
             Log.i(TAG, "scheduled self-guard start after ${delay}ms on $action")
             handler.postDelayed({
+                // V5.2.2：开机/更新后先做授权通道联动——检测到任一授权通道（ADB 授予/Root/Shizuku）
+                // 可用且自监控未开启时，自动开启"无障碍自监控（低耗电）"，无需用户操作。
+                try {
+                    SelfGuardService.enableIfChannelReady(appCtx)
+                } catch (t: Throwable) {
+                    Log.w(TAG, "auto enable self guard on boot failed", t)
+                }
                 // 自监控已合并看门狗全部功能：ContentObserver 实时监听 + 兜底慢检
                 // 只需启动 SelfGuardService 一个前台服务，无需再启动 WatchdogService
                 if (Prefs.isSelfGuardEnabled(appCtx)) {

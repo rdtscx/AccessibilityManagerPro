@@ -67,6 +67,8 @@ class HomeFragment : Fragment() {
             val ctx = requireContext()
             Prefs.setSelfGuardEnabled(ctx, checked)
             if (checked) {
+                // 用户手动开启：清除"禁用自动开启"标记，恢复通道联动能力
+                Prefs.setAutoSelfGuardDisabledByUser(ctx, false)
                 if (Build.VERSION.SDK_INT >= 33 &&
                     ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED
@@ -76,6 +78,8 @@ class HomeFragment : Fragment() {
                 SelfGuardService.start(ctx)
                 Toast.makeText(ctx, R.string.self_guard_enabled_toast, Toast.LENGTH_SHORT).show()
             } else {
+                // 用户手动关闭：记录豁免标记，此后不再被授权通道联动自动开启
+                Prefs.setAutoSelfGuardDisabledByUser(ctx, true)
                 SelfGuardService.stop(ctx)
             }
         }
@@ -240,6 +244,14 @@ class HomeFragment : Fragment() {
 
     private fun refresh() {
         val ctx = requireContext()
+
+        // V5.2.2：授权通道联动——检测到任一授权通道可用且自监控未开启时自动开启。
+        // 放在刷新最前，保证用户从系统授权页返回首页后开关状态即时同步为"已开启"。
+        try {
+            SelfGuardService.enableIfChannelReady(ctx)
+        } catch (t: Throwable) {
+            android.util.Log.w("HomeFragment", "auto enable self guard failed", t)
+        }
 
         // 本应用无障碍服务状态
         val enabled = selfAccessEnabled(ctx)

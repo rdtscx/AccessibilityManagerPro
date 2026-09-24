@@ -93,6 +93,34 @@ class SelfGuardService : Service() {
             }
         }
 
+        /**
+         * 授权通道联动（V5.2.2）：检测到任一授权通道（ADB 授予 / Root / Shizuku）可用，
+         * 且自监控未开启、用户也未手动关闭过时，自动开启"无障碍自监控（低耗电）"并拉起服务。
+         *
+         * 设计要点：
+         *  - 幂等：自监控已开启时直接返回，不重复启动；
+         *  - 尊重用户：用户在界面手动关闭过自监控（isAutoSelfGuardDisabledByUser=true）
+         *    后不再自动开启，避免与用户操作意图冲突；
+         *  - 无感：自动开启不弹 Toast、不申请通知权限，纯后台静默完成；
+         *  - 无通道时不开启：自监控的自动拉起依赖授权通道，无通道时开启只会徒增
+         *    常驻通知与无意义的"请手动开启"引导，故仅在通道就绪后联动。
+         */
+        fun enableIfChannelReady(ctx: Context) {
+            try {
+                if (Prefs.isSelfGuardEnabled(ctx)) return
+                if (Prefs.isAutoSelfGuardDisabledByUser(ctx)) return
+                val channel = Privilege.bestChannel(ctx)
+                if (channel == Privilege.Channel.NONE) return
+                Log.i(TAG, "auto enable self guard: channel=$channel")
+                Prefs.setAutoSelfGuardDisabledByUser(ctx, false)
+                Prefs.setSelfGuardEnabled(ctx, true)
+                start(ctx)
+                EventLog.record(ctx, EventLog.TYPE_RESTORED, ctx.packageName, "auto enabled self guard via $channel")
+            } catch (t: Throwable) {
+                Log.w(TAG, "auto enable self guard failed", t)
+            }
+        }
+
         fun stop(ctx: Context) {
             ctx.stopService(Intent(ctx, SelfGuardService::class.java))
         }

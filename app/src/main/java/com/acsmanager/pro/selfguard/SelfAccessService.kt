@@ -38,6 +38,9 @@ class SelfAccessService : AccessibilityService() {
             ) {
                 SelfGuardService.start(this)
             }
+            // V5.2.2：授权通道联动——本应用无障碍被开启（说明用户正在使用保活功能），
+            // 若检测到任一授权通道可用且自监控未开启，自动开启自监控低耗电。
+            SelfGuardService.enableIfChannelReady(this)
         } catch (t: Throwable) {
             android.util.Log.w("SelfAccessService", "self-heal self guard failed", t)
         }

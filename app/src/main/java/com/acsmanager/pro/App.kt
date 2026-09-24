@@ -15,6 +15,15 @@ class App : Application() {
         super.onCreate()
         applyThemeMode()
         initShizukuListeners()
+        // V5.2.2：启动后检测授权通道（ADB 授予 / Root / Shizuku），任一可用即自动开启自监控低耗电。
+        // 延迟 1s 执行，等进程初始化完成；检测内部含 Root 探测，成功后进程内永久缓存，成本极低。
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            try {
+                com.acsmanager.pro.selfguard.SelfGuardService.enableIfChannelReady(this)
+            } catch (t: Throwable) {
+                Log.w(TAG, "auto enable self guard on app start failed", t)
+            }
+        }, 1000L)
     }
 
     /**
@@ -42,6 +51,12 @@ class App : Application() {
     private val binderReceivedListener = rikka.shizuku.Shizuku.OnBinderReceivedListener {
         Log.i(TAG, "Shizuku binder received")
         shizukuBinderAlive = true
+        // V5.2.2：Shizuku 通道就绪（用户授权/启动 Shizuku）时，自动开启自监控低耗电
+        try {
+            com.acsmanager.pro.selfguard.SelfGuardService.enableIfChannelReady(this)
+        } catch (t: Throwable) {
+            Log.w(TAG, "auto enable self guard on shizuku binder failed", t)
+        }
     }
 
     private val binderDeadListener = rikka.shizuku.Shizuku.OnBinderDeadListener {
