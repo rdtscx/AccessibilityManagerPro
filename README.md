@@ -20,67 +20,67 @@
 
 ### **1. 首次授权**
 
-打开软件后，推荐使用 ADB 激活。如果你有 Root 或者装了 Shizuku 也可以直接用，没装的话走 ADB 最省事。授权成功后软件会自动跳回首页。
+推荐使用 ADB 激活。如果你有 Root 或者装了 Shizuku 也可以直接用，没装的话走 ADB。授权成功后软件会自动回首页。
 
-<p align="center">
-  <img src="assets/screenshot-auth-methods.jpg" width="500" alt="授权方式选择"/>
-</p>
+&lt;p align="center"&gt;
+  &lt;img src="assets/screenshot-auth-methods.jpg" width="500" alt="授权方式选择"/&gt;
+&lt;/p&gt;
 
-**用数据线连到电脑，开启 USB 调试后，在终端里跑下面这一条就行，一次性把全部权限都给了：**
+**用数据线连到电脑，开启 USB 调试后，在终端里跑下面这一条：**
 
 ```bash
-pm grant com.acsmanager.pro android.permission.WRITE_SECURE_SETTINGS && pm grant com.acsmanager.pro android.permission.WRITE_SETTINGS && pm grant com.acsmanager.pro android.permission.POST_NOTIFICATIONS && appops set com.acsmanager.pro android:get_usage_stats allow && settings put secure enabled_accessibility_services com.acsmanager.pro/com.acsmanager.pro.selfguard.SelfAccessService && settings put secure accessibility_enabled 1 && settings put secure enabled_notification_listeners com.acsmanager.pro/com.acsmanager.pro.notif.NotifGateService && settings put secure notification_access_enabled 1
+pm grant com.acsmanager.pro android.permission.WRITE_SECURE_SETTINGS &amp;&amp; pm grant com.acsmanager.pro android.permission.WRITE_SETTINGS &amp;&amp; pm grant com.acsmanager.pro android.permission.POST_NOTIFICATIONS &amp;&amp; appops set com.acsmanager.pro android:get_usage_stats allow &amp;&amp; settings put secure enabled_accessibility_services com.acsmanager.pro/com.acsmanager.pro.selfguard.SelfAccessService &amp;&amp; settings put secure accessibility_enabled 1 &amp;&amp; settings put secure enabled_notification_listeners com.acsmanager.pro/com.acsmanager.pro.notif.NotifGateService &amp;&amp; settings put secure notification_access_enabled 1
 ```
 
-### **2. 打开自监控**
+### **2. 自监控**
 
-**在首页找到"无障碍自监控（低耗电）"这一项，把开关打开。**它靠监听系统设置变化来判断服务有没有被关，不做轮询，基本不耗电。延迟时间按需调，默认 1 秒就够。
+**在首页找到"无障碍自监控（低耗电）"这一项，把开关打开。**它靠监听系统设置变化来判断服务有没有被关，不做轮询，基本不耗电。延迟时间按需调，默认 1 秒。
 
-<p align="center">
-  <img src="assets/screenshot-self-monitor.jpg" width="500" alt="无障碍自监控开关"/>
-</p>
+&lt;p align="center"&gt;
+  &lt;img src="assets/screenshot-self-monitor.jpg" width="500" alt="无障碍自监控开关"/&gt;
+&lt;/p&gt;
 
 ### **3. 配置要保护的无障碍服务**
 
 **往下滑找到"授权状态"卡片，点"无障碍权限（应用开关·锁定）"进入列表。**
 
-<p align="center">
-  <img src="assets/screenshot-auth-status.jpg" width="400" alt="授权状态卡片"/>
-</p>
+&lt;p align="center"&gt;
+  &lt;img src="assets/screenshot-auth-status.jpg" width="400" alt="授权状态卡片"/&gt;
+&lt;/p&gt;
 
-**在列表里找到你想保护的那个无障碍服务，先打开它的授权，再把右边的锁点亮。**锁上之后，这个服务就算被手动关掉，软件也会自动重新拉起。
+**在列表里找到想保护的无障碍服务，打开授权，右边的锁点亮。**
 
-### **4. 验证一下效果**
+### **4. 验证**
 
-**不放心的话，可以自己去系统的无障碍设置页，把刚才锁好的那个服务手动关掉。**正常情况下，一秒之内它就会被自动拉回来，不用手动再开。
+**去系统的无障碍设置页，把刚才锁好的服务关掉。**正常情况下，会被自动拉回。
 
-<p align="center">
-  <img src="assets/screenshot-event-log.jpg" width="450" alt="事件监控日志"/>
-</p>
+&lt;p align="center"&gt;
+  &lt;img src="assets/screenshot-event-log.jpg" width="450" alt="事件监控日志"/&gt;
+&lt;/p&gt;
 
-上面的日志就是实际测试的效果：先记录到"丢失"，紧接着就触发了"自动恢复"，全程不到一秒。
+上面的日志就是实际测试的效果，全程一秒。
 
-### **5. 看日志**
+### **5. 日志**
 
-**拉到页面最底下的"快捷入口"，点"监控"就能看到运行日志**，改参数、调延迟的时候可以对着日志测。
+**拉到页面最底下的"快捷入口"，点"监控"就能看到运行日志。**
 
-<p align="center">
-  <img src="assets/screenshot-quick-entry.jpg" width="400" alt="快捷入口"/>
-</p>
+&lt;p align="center"&gt;
+  &lt;img src="assets/screenshot-quick-entry.jpg" width="400" alt="快捷入口"/&gt;
+&lt;/p&gt;
 
 ## 捐助
 
-如果这个项目对你有帮助，欢迎随意打赏一杯咖啡，感谢支持！
+如果这个项目对你有帮助，欢迎随意打赏，感谢支持！
 
-<table>
-  <tr>
-    <td align="center" style="padding:10px;">
-      <img src="assets/wechat-pay.jpg" width="240" alt="微信支付"/>
-      <br/>微信支付
-    </td>
-    <td align="center" style="padding:10px;">
-      <img src="assets/alipay.jpg" width="240" alt="支付宝"/>
-      <br/>支付宝
-    </td>
-  </tr>
-</table>
+&lt;table&gt;
+  &lt;tr&gt;
+    &lt;td align="center" style="padding:10px;"&gt;
+      &lt;img src="assets/wechat-pay.jpg" width="240" alt="微信支付"/&gt;
+      &lt;br/&gt;微信支付
+    &lt;/td&gt;
+    &lt;td align="center" style="padding:10px;"&gt;
+      &lt;img src="assets/alipay.jpg" width="240" alt="支付宝"/&gt;
+      &lt;br/&gt;支付宝
+    &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/table&gt;
