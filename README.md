@@ -34,7 +34,7 @@ pm grant com.acsmanager.pro android.permission.WRITE_SECURE_SETTINGS && pm grant
 
 ### 2. 自监控
 
-<p style="font-size:18px;">在首页找到"无障碍自监控（低耗电）"这一项，<strong>把开关打开</strong>。它靠监听系统设置变化来判断服务有没有被关，不做轮询，基本不耗电。延迟时间按需调，默认 1 秒。</p>
+<p style="font-size:18px;">在首页找到"无障碍自监控（低耗电）"这一项，<strong>把开关打开</strong>。监听系统设置变化判断服务，不做轮询，基本不耗电。延迟时间按需调，默认 1 秒。</p>
 
 <p align="center">
   <img src="assets/screenshot-self-monitor.jpg" width="500" alt="无障碍自监控开关"/>
