@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AccessibilityManagerPro" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorPrimaryContainer">@color/primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/on_primary_container</item>
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="colorOnSecondary">@color/on_secondary</item>
+        <item name="colorSecondaryContainer">@color/secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/on_secondary_container</item>
+        <item name="colorSurfaceVariant">@color/surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/on_surface_variant</item>
+        <item name="colorOutline">@color/outline</item>
+        <item name="android:windowBackground">?attr/colorSurface</item>
+    </style>
+
+    <!-- 能力徽章：深色模式自动切换文字/底色 -->
+    <style name="ChipBadge">
+        <item name="android:background">@drawable/badge_chip</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textColor">@color/chip_text</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:paddingTop">2dp</item>
+        <item name="android:paddingBottom">2dp</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <!-- 现代化卡片：统一 16dp 圆角 -->
+    <style name="Widget.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardCornerRadius">16dp</item>
+        <item name="cardElevation">1dp</item>
+        <item name="strokeWidth">0dp</item>
+    </style>
+
+    <!-- 现代化设置项卡片（用于保活/通知/开发者/实验列表项） -->
+    <style name="Widget.ItemCard" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardCornerRadius">14dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">?attr/colorOutlineVariant</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <!-- 页面分区标题 -->
+    <style name="TextAppearance.Section" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+</resources>

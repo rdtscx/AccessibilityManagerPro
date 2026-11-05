@@ -1,0 +1,813 @@
+package com.acsmanager.pro.util
+
+import android.content.Context
+import android.content.SharedPreferences
+import org.json.JSONArray
+import org.json.JSONObject
+
+object Prefs {
+
+    private const val NAME = "acs_pro"
+    private const val APP_TAG = "acs_manager_pro"
+
+    fun get(ctx: Context): SharedPreferences =
+        ctx.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+
+    // ---------- 看门狗 ----------
+    fun isWatchdogEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("watchdog_enabled", false)
+
+    fun setWatchdogEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("watchdog_enabled", v).apply()
+    }
+
+    fun watchdogIntervalMs(ctx: Context): Long =
+        get(ctx).getLong("watchdog_interval", 60_000L)
+
+    fun setWatchdogIntervalMs(ctx: Context, v: Long) {
+        get(ctx).edit().putLong("watchdog_interval", v).apply()
+    }
+
+    fun protectedServices(ctx: Context): Set<String> =
+        get(ctx).getStringSet("protected", emptySet()) ?: emptySet()
+
+    fun setProtectedServices(ctx: Context, v: Set<String>) {
+        get(ctx).edit().putStringSet("protected", v.toSet()).apply()
+    }
+
+    // ---------- 快捷磁贴 ----------
+    fun tileService(ctx: Context): String? =
+        get(ctx).getString("tile_service", null)
+
+    fun setTileService(ctx: Context, v: String?) {
+        get(ctx).edit().putString("tile_service", v).apply()
+    }
+
+    // ---------- 外观 ----------
+    fun themeMode(ctx: Context): String =
+        get(ctx).getString("theme", "system") ?: "system"
+
+    fun setThemeMode(ctx: Context, v: String) {
+        get(ctx).edit().putString("theme", v).apply()
+    }
+
+    fun language(ctx: Context): String =
+        get(ctx).getString("language", "system") ?: "system"
+
+    fun setLanguage(ctx: Context, v: String) {
+        get(ctx).edit().putString("language", v).apply()
+    }
+
+    // ---------- 备份 / 恢复 ----------
+    fun exportJson(ctx: Context): String {
+        val o = JSONObject()
+        o.put("app", APP_TAG)
+        o.put("version", 2)
+        // 看门狗
+        o.put("watchdog_enabled", isWatchdogEnabled(ctx))
+        o.put("watchdog_interval", watchdogIntervalMs(ctx))
+        o.put("protected", setToJson(protectedServices(ctx)))
+        o.put("tile_service", tileService(ctx) ?: "")
+        // 自监控
+        o.put("self_guard_enabled", isSelfGuardEnabled(ctx))
+        o.put("self_guard_delay", selfGuardDelayMs(ctx))
+        o.put("user_disabled_auto_self_guard", isAutoSelfGuardDisabledByUser(ctx))
+        // 应用保活
+        o.put("keepalive_apps", setToJson(keepAliveApps(ctx)))
+        o.put("keepalive_interval", keepAliveIntervalMs(ctx))
+        o.put("keepalive_screenoff_only", keepAliveScreenOffOnly(ctx))
+        o.put("keepalive_pause_low_battery", keepAlivePauseLowBattery(ctx))
+        o.put("keepalive_battery_threshold", keepAliveBatteryThreshold(ctx))
+        o.put("keepalive_black_screen", keepAliveBlackScreen(ctx))
+        o.put("keepalive_return_mode", keepAliveReturnMode(ctx))
+        // 通知
+        o.put("notif_levels", get(ctx).getString(KEY_NOTIF_LEVELS, "{}") ?: "{}")
+        o.put("notif_override_enabled", notifOverrideEnabled(ctx))
+        o.put("notif_history_enabled", notifHistoryEnabled(ctx))
+        // 无障碍锁定与开机保活
+        o.put("locked_accessibility", setToJson(lockedAccessibilityServices(ctx)))
+        o.put("boot_accessibility", setToJson(bootAccessibilityServices(ctx)))
+        // 保活提示
+        o.put("relaunch_toast", relaunchToastEnabled(ctx))
+        o.put("relaunch_toast_text", relaunchToastText(ctx) ?: "")
+        // 外观
+        o.put("theme", themeMode(ctx))
+        o.put("language", language(ctx))
+        // 无障碍权限页
+        o.put("accessperm_user_only", accessPermUserOnly(ctx))
+        // 实验
+        o.put("event_throttle", eventThrottleMs(ctx))
+        // 从最近应用列表隐藏
+        o.put("hide_from_recents", hideFromRecents(ctx))
+        return o.toString(2)
+    }
+
+    fun importJson(ctx: Context, json: String): Boolean {
+        return try {
+            val o = JSONObject(json)
+            if (o.optString("app") != APP_TAG) return false
+            val ver = o.optInt("version", 1)
+            // 看门狗
+            setWatchdogEnabled(ctx, o.optBoolean("watchdog_enabled", false))
+            setWatchdogIntervalMs(ctx, o.optLong("watchdog_interval", 60_000L))
+            setProtectedServices(ctx, jsonToSet(o.optJSONObject("protected")))
+            setTileService(ctx, o.optString("tile_service", "").ifBlank { null })
+            // v2+ 字段（v1 备份中不存在时使用默认值，不覆盖用户当前设置）
+            if (ver >= 2) {
+                setSelfGuardEnabled(ctx, o.optBoolean("self_guard_enabled", false))
+                setSelfGuardDelayMs(ctx, o.optLong("self_guard_delay", 1000L))
+                setAutoSelfGuardDisabledByUser(ctx, o.optBoolean("user_disabled_auto_self_guard", false))
+                setKeepAliveApps(ctx, jsonToSet(o.optJSONObject("keepalive_apps")))
+                setKeepAliveIntervalMs(ctx, o.optLong("keepalive_interval", 30_000L))
+                setKeepAliveScreenOffOnly(ctx, o.optBoolean("keepalive_screenoff_only", true))
+                setKeepAlivePauseLowBattery(ctx, o.optBoolean("keepalive_pause_low_battery", true))
+                setKeepAliveBatteryThreshold(ctx, o.optInt("keepalive_battery_threshold", 15))
+                setKeepAliveBlackScreen(ctx, o.optBoolean("keepalive_black_screen", true))
+                setKeepAliveReturnMode(ctx, o.optString("keepalive_return_mode", "prev"))
+                o.optString("notif_levels").takeIf { it.isNotBlank() }?.let {
+                    get(ctx).edit().putString(KEY_NOTIF_LEVELS, it).apply()
+                }
+                setNotifOverrideEnabled(ctx, o.optBoolean("notif_override_enabled", true))
+                setNotifHistoryEnabled(ctx, o.optBoolean("notif_history_enabled", true))
+                setLockedAccessibilityServices(ctx, jsonToSet(o.optJSONObject("locked_accessibility")))
+                setBootAccessibilityServices(ctx, jsonToSet(o.optJSONObject("boot_accessibility")))
+                setRelaunchToastEnabled(ctx, o.optBoolean("relaunch_toast", false))
+                setRelaunchToastText(ctx, o.optString("relaunch_toast_text", "").ifBlank { null })
+                setThemeMode(ctx, o.optString("theme", "system"))
+                setLanguage(ctx, o.optString("language", "system"))
+                setAccessPermUserOnly(ctx, o.optBoolean("accessperm_user_only", false))
+                setEventThrottleMs(ctx, o.optLong("event_throttle", 300L))
+                setHideFromRecents(ctx, o.optBoolean("hide_from_recents", false))
+            }
+            true
+        } catch (t: Throwable) {
+            false
+        }
+    }
+
+    private fun setToJson(set: Set<String>): JSONObject = JSONObject().apply {
+        set.forEachIndexed { i, s -> put(i.toString(), s) }
+    }
+
+    private fun jsonToSet(obj: JSONObject?): Set<String> {
+        if (obj == null) return emptySet()
+        val result = mutableSetOf<String>()
+        val it = obj.keys()
+        while (it.hasNext()) {
+            val v = obj.optString(it.next())
+            if (v.isNotBlank()) result.add(v)
+        }
+        return result
+    }
+
+    // ---------- 无障碍自监控（ContentObserver 低耗电 + 延迟拉起） ----------
+
+    fun isSelfGuardEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("self_guard_enabled", false)
+
+    fun setSelfGuardEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("self_guard_enabled", v).apply()
+    }
+
+    /**
+     * 7.0.1：自监控"待启动"标记。
+     *
+     * 后台（开机广播 / Application 冷启动）调用 startForegroundService 时，
+     * Android 12+ 会直接抛 ForegroundServiceStartNotAllowedException，服务根本起不来，
+     * 而用户看到开关是"开启"状态，误以为功能生效。现在失败即打标记，
+     * 下一次应用进入前台时补启动，保证开关状态与实际运行状态一致。
+     */
+    fun isSelfGuardStartPending(ctx: Context): Boolean =
+        get(ctx).getBoolean("self_guard_start_pending", false)
+
+    fun setSelfGuardStartPending(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("self_guard_start_pending", v).apply()
+    }
+
+    /** 检测到无障碍被关闭后，延迟多久尝试拉起（毫秒，默认 1000 = 1 秒）。 */
+    fun selfGuardDelayMs(ctx: Context): Long =
+        get(ctx).getLong("self_guard_delay", 1000L)
+
+    fun setSelfGuardDelayMs(ctx: Context, v: Long) {
+        get(ctx).edit().putLong("self_guard_delay", v.coerceIn(100L, 30_000L)).apply()
+    }
+
+    // ---------- 授权通道自动开启自监控（V5.2.2） ----------
+
+    /**
+     * 用户是否手动关闭过自监控（V5.2.2 自动开启的豁免标记）。
+     * 默认 false：检测到任一授权通道（ADB 授予 / Root / Shizuku）可用时，
+     * 自动开启"无障碍自监控（低耗电）"，无需用户操作。
+     * 用户在界面手动关闭开关时置 true，此后不再被自动开启，尊重用户选择。
+     */
+    fun isAutoSelfGuardDisabledByUser(ctx: Context): Boolean =
+        get(ctx).getBoolean("user_disabled_auto_self_guard", false)
+
+    fun setAutoSelfGuardDisabledByUser(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("user_disabled_auto_self_guard", v).apply()
+    }
+
+    // ---------- 应用保活 ----------
+
+    fun keepAliveApps(ctx: Context): Set<String> =
+        get(ctx).getStringSet("keepalive_apps", emptySet()) ?: emptySet()
+
+    fun setKeepAliveApps(ctx: Context, v: Set<String>) {
+        get(ctx).edit().putStringSet("keepalive_apps", v.toSet()).apply()
+    }
+
+    fun isKeepAlive(ctx: Context, pkg: String): Boolean = pkg in keepAliveApps(ctx)
+
+    // ---------- 按组件粒度的保活（勾选单个 Service/Activity） ----------
+
+    /** 保活的组件集合，元素为 ComponentName.flattenToString()（"pkg/cls"）。 */
+    fun keepAliveComponents(ctx: Context): Set<String> =
+        get(ctx).getStringSet("keepalive_components", emptySet()) ?: emptySet()
+
+    fun setKeepAliveComponents(ctx: Context, v: Set<String>) {
+        get(ctx).edit().putStringSet("keepalive_components", v.toSet()).apply()
+    }
+
+    fun isComponentKept(ctx: Context, componentFlat: String): Boolean =
+        componentFlat in keepAliveComponents(ctx)
+
+    /** 某包下被勾选保活的组件集合。 */
+    fun componentsForPackage(ctx: Context, pkg: String): Set<String> =
+        keepAliveComponents(ctx).filter { it.startsWith("$pkg/") }.toSet()
+
+    /** 保活巡检间隔（毫秒）。 */
+    fun keepAliveIntervalMs(ctx: Context): Long =
+        get(ctx).getLong("keepalive_interval", 30_000L)
+
+    fun setKeepAliveIntervalMs(ctx: Context, v: Long) {
+        get(ctx).edit().putLong("keepalive_interval", v.coerceIn(10_000L, 300_000L)).apply()
+    }
+
+    /** 实验开关：仅在屏幕关闭/用户闲置时后台无感拉起（默认开，不影响用户正在操作）。 */
+    fun keepAliveScreenOffOnly(ctx: Context): Boolean =
+        get(ctx).getBoolean("keepalive_screenoff_only", true)
+
+    fun setKeepAliveScreenOffOnly(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("keepalive_screenoff_only", v).apply()
+    }
+
+    /** 实验开关：低电量时暂停保活。 */
+    fun keepAlivePauseLowBattery(ctx: Context): Boolean =
+        get(ctx).getBoolean("keepalive_pause_low_battery", true)
+
+    fun setKeepAlivePauseLowBattery(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("keepalive_pause_low_battery", v).apply()
+    }
+
+    /** 低电量暂停阈值（百分比）。 */
+    fun keepAliveBatteryThreshold(ctx: Context): Int =
+        get(ctx).getInt("keepalive_battery_threshold", 15)
+
+    fun setKeepAliveBatteryThreshold(ctx: Context, v: Int) {
+        get(ctx).edit().putInt("keepalive_battery_threshold", v.coerceIn(5, 50)).apply()
+    }
+
+    /** 单应用拉起冷却（毫秒），防止与用户操作冲突形成循环。 */
+    fun keepAliveCooldownMs(ctx: Context): Long =
+        get(ctx).getLong("keepalive_cooldown", 5_000L)
+
+    /** 黑屏（熄屏）状态下被杀后台时，是否也拉起保活应用（默认开）。 */
+    fun keepAliveBlackScreen(ctx: Context): Boolean =
+        get(ctx).getBoolean("keepalive_black_screen", true)
+
+    fun setKeepAliveBlackScreen(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("keepalive_black_screen", v).apply()
+    }
+
+    /**
+     * 拉起后的返回方案（"返回上一个应用时，提供几种返回方案供用户选择"）：
+     *  - prev：拉起后 100ms 自动切回用户上一个软件（无感保活，默认）
+     *  - stay：拉起后停留在目标软件
+     *  - home：拉起后 100ms 返回桌面
+     */
+    fun keepAliveReturnMode(ctx: Context): String =
+        get(ctx).getString("keepalive_return_mode", "prev") ?: "prev"
+
+    fun setKeepAliveReturnMode(ctx: Context, v: String) {
+        get(ctx).edit().putString("keepalive_return_mode", v).apply()
+    }
+
+    /** 拉起后等待多少毫秒再切回上一个应用（默认 100ms，用户可自定义 1~5000ms，1ms 步进）。 */
+    fun keepAliveReturnDelayMs(ctx: Context): Long =
+        get(ctx).getLong("keepalive_return_delay", 100L)
+
+    fun setKeepAliveReturnDelayMs(ctx: Context, v: Long) {
+        get(ctx).edit().putLong("keepalive_return_delay", v.coerceIn(1L, 5000L)).apply()
+    }
+
+    // ---------- 统计 ----------
+
+    private fun today(): String {
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        return sdf.format(java.util.Date())
+    }
+
+    fun relaunchCount(ctx: Context): Int {
+        val d = get(ctx).getString("relaunch_date", "")
+        return if (d == today()) get(ctx).getInt("relaunch_count", 0) else 0
+    }
+
+    fun bumpRelaunch(ctx: Context) {
+        val e = get(ctx).edit()
+        val d = get(ctx).getString("relaunch_date", "")
+        val c = if (d == today()) get(ctx).getInt("relaunch_count", 0) else 0
+        e.putString("relaunch_date", today())
+        e.putInt("relaunch_count", c + 1)
+        e.apply()
+    }
+
+    fun notifBlockCount(ctx: Context): Int =
+        get(ctx).getInt("notif_block_count", 0)
+
+    fun bumpNotifBlock(ctx: Context) {
+        get(ctx).edit().putInt("notif_block_count", notifBlockCount(ctx) + 1).apply()
+    }
+
+    fun resetNotifBlockCount(ctx: Context) {
+        get(ctx).edit().putInt("notif_block_count", 0).apply()
+    }
+
+    // ---------- 本次运行累计拉起次数（App 启动后从零开始，进程死亡即归零） ----------
+
+    /** 本次运行期间累计拉起次数（无障碍 + 应用保活合计）。不持久化，App 启动后从 0 开始。 */
+    @Volatile
+    private var runtimePullCount: Int = 0
+
+    /** 读取本次运行累计拉起次数。 */
+    fun totalPullCount(ctx: Context): Int = runtimePullCount
+
+    /** 累计拉起次数 +1，并持久化。 */
+    fun bumpTotalPull(ctx: Context) {
+        runtimePullCount += 1
+    }
+
+    // ---------- 通知 0-5 级调控 ----------
+
+    private const val KEY_NOTIF_LEVELS = "notif_levels"
+    private const val KEY_NOTIF_HISTORY = "notif_history"
+    private const val KEY_NOTIF_CHANNEL_LEVELS = "notif_channel_levels"
+    private const val KEY_NOTIF_HIDDEN_CHANNELS = "notif_hidden_channels"
+
+    // V6.0.0：进程内缓存——通知监听服务在每条通知的高频路径上多次读取等级/隐藏渠道，
+    // 原先每次都全量解析 SharedPreferences 中的大 JSON 字符串，产生大量临时对象（GC 压力）。
+    // 缓存以"原始字符串是否变化"为失效依据：SharedPreferences 写入后 raw 变化即重新解析。
+
+    @Volatile
+    private var notifLevelsCacheRaw: String? = null
+    private var notifLevelsCacheMap: Map<String, Int>? = null
+
+    @Volatile
+    private var notifChannelLevelsCacheRaw: String? = null
+    private var notifChannelLevelsCacheMap: Map<String, Int>? = null
+
+    @Volatile
+    private var notifHiddenChannelsCacheRaw: Set<String>? = null
+    private var notifHiddenChannelsCacheSet: Set<String>? = null
+
+    /** 获取指定包名的通知调控等级（0-5，默认 3 = 标准）。带进程内缓存。 */
+    fun notifLevel(ctx: Context, pkg: String): Int {
+        val raw = get(ctx).getString(KEY_NOTIF_LEVELS, null) ?: return 3
+        val map = synchronized(this) {
+            if (notifLevelsCacheRaw != raw) {
+                notifLevelsCacheRaw = raw
+                notifLevelsCacheMap = parseLevelMap(raw)
+            }
+            notifLevelsCacheMap
+        } ?: return 3
+        return map[pkg] ?: 3
+    }
+
+    private fun parseLevelMap(raw: String): Map<String, Int>? = try {
+        val o = JSONObject(raw)
+        val m = HashMap<String, Int>()
+        val it = o.keys()
+        while (it.hasNext()) {
+            val k = it.next()
+            m[k] = o.optInt(k, 3)
+        }
+        m
+    } catch (t: Throwable) {
+        null
+    }
+
+    fun setNotifLevel(ctx: Context, pkg: String, level: Int) {
+        val raw = get(ctx).getString(KEY_NOTIF_LEVELS, "{}") ?: "{}"
+        try {
+            val o = JSONObject(raw)
+            o.put(pkg, level.coerceIn(0, 5))
+            get(ctx).edit().putString(KEY_NOTIF_LEVELS, o.toString()).apply()
+        } catch (t: Throwable) {
+        }
+    }
+
+    /** 移除某包的自定义等级（滑回系统默认 3 时调用）。 */
+    fun resetNotifLevel(ctx: Context, pkg: String) {
+        val raw = get(ctx).getString(KEY_NOTIF_LEVELS, "{}") ?: "{}"
+        try {
+            val o = JSONObject(raw)
+            o.remove(pkg)
+            get(ctx).edit().putString(KEY_NOTIF_LEVELS, o.toString()).apply()
+        } catch (t: Throwable) {
+        }
+    }
+
+    fun notifLevels(ctx: Context): Map<String, Int> {
+        val raw = get(ctx).getString(KEY_NOTIF_LEVELS, null) ?: return emptyMap()
+        return synchronized(this) {
+            if (notifLevelsCacheRaw != raw) {
+                notifLevelsCacheRaw = raw
+                notifLevelsCacheMap = parseLevelMap(raw)
+            }
+            notifLevelsCacheMap ?: emptyMap()
+        }
+    }
+
+    fun resetNotifLevels(ctx: Context) {
+        get(ctx).edit().remove(KEY_NOTIF_LEVELS).apply()
+    }
+
+    /** 实验开关：尝试用系统命令精细调控（需 Root/Shizuku/ADB + Android 14+）。 */
+    fun notifOverrideEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("notif_override_enabled", true)
+
+    fun setNotifOverrideEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("notif_override_enabled", v).apply()
+    }
+
+    /** 实验开关：拦截历史记录。 */
+    fun notifHistoryEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("notif_history_enabled", true)
+
+    fun setNotifHistoryEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("notif_history_enabled", v).apply()
+    }
+
+    fun appendNotifHistory(ctx: Context, pkg: String, action: String) {
+        if (!notifHistoryEnabled(ctx)) return
+        val raw = get(ctx).getString(KEY_NOTIF_HISTORY, "[]") ?: "[]"
+        try {
+            val arr = JSONArray(raw)
+            val o = JSONObject()
+            o.put("t", System.currentTimeMillis())
+            o.put("p", pkg)
+            o.put("a", action)
+            arr.put(o)
+            while (arr.length() > 200) arr.remove(0)
+            get(ctx).edit().putString(KEY_NOTIF_HISTORY, arr.toString()).apply()
+        } catch (t: Throwable) {
+        }
+    }
+
+    fun notifHistory(ctx: Context): JSONArray {
+        val raw = get(ctx).getString(KEY_NOTIF_HISTORY, "[]") ?: "[]"
+        return try {
+            JSONArray(raw)
+        } catch (t: Throwable) {
+            JSONArray()
+        }
+    }
+
+    fun clearNotifHistory(ctx: Context) {
+        get(ctx).edit().remove(KEY_NOTIF_HISTORY).apply()
+    }
+
+    // ---------- 单渠道级别 & 隐藏渠道（通知历史二级页用） ----------
+
+    /** 单渠道级别：key = "pkg/channelId"，value = 0~5。优先于应用整体级别。带进程内缓存。 */
+    fun notifChannelLevel(ctx: Context, pkg: String, channelId: String): Int {
+        val key = "$pkg/$channelId"
+        val raw = get(ctx).getString(KEY_NOTIF_CHANNEL_LEVELS, "{}") ?: "{}"
+        val map = synchronized(this) {
+            if (notifChannelLevelsCacheRaw != raw) {
+                notifChannelLevelsCacheRaw = raw
+                notifChannelLevelsCacheMap = parseLevelMap(raw)
+            }
+            notifChannelLevelsCacheMap
+        } ?: return -1
+        return map[key] ?: -1
+    }
+
+    fun setNotifChannelLevel(ctx: Context, pkg: String, channelId: String, level: Int) {
+        val key = "$pkg/$channelId"
+        val raw = get(ctx).getString(KEY_NOTIF_CHANNEL_LEVELS, "{}") ?: "{}"
+        try {
+            val o = JSONObject(raw)
+            o.put(key, level.coerceIn(0, 5))
+            get(ctx).edit().putString(KEY_NOTIF_CHANNEL_LEVELS, o.toString()).apply()
+        } catch (t: Throwable) {
+        }
+    }
+
+    /** 隐藏渠道集合：遇到该 pkg/channelId 的通知直接取消不显示。带进程内缓存。 */
+    fun notifHiddenChannels(ctx: Context): Set<String> {
+        val raw = get(ctx).getStringSet(KEY_NOTIF_HIDDEN_CHANNELS, emptySet()) ?: emptySet()
+        return synchronized(this) {
+            if (notifHiddenChannelsCacheRaw != raw) {
+                notifHiddenChannelsCacheRaw = raw
+                notifHiddenChannelsCacheSet = raw.toSet()
+            }
+            notifHiddenChannelsCacheSet ?: emptySet()
+        }
+    }
+
+    fun isChannelHidden(ctx: Context, pkg: String, channelId: String): Boolean =
+        "$pkg/$channelId" in notifHiddenChannels(ctx)
+
+    fun setChannelHidden(ctx: Context, pkg: String, channelId: String, hidden: Boolean) {
+        val set = notifHiddenChannels(ctx).toMutableSet()
+        val key = "$pkg/$channelId"
+        if (hidden) set.add(key) else set.remove(key)
+        get(ctx).edit().putStringSet(KEY_NOTIF_HIDDEN_CHANNELS, set).apply()
+    }
+
+    // ---------- 完整通知历史（二级页列表用） ----------
+
+    /** 追加一条完整通知历史（pkg/channelId/title/text/time）。 */
+    fun appendNotifHistoryFull(ctx: Context, pkg: String, channelId: String, title: String, text: String) {
+        if (!notifHistoryEnabled(ctx)) return
+        val raw = get(ctx).getString("notif_history_v2", "[]") ?: "[]"
+        try {
+            val arr = JSONArray(raw)
+            val now = System.currentTimeMillis()
+            // 同应用同渠道 5 秒内重复通知只记一条（避免刷屏）
+            if (arr.length() > 0) {
+                val last = arr.getJSONObject(arr.length() - 1)
+                val lastT = last.optLong("t", 0L)
+                val lastP = last.optString("p", "")
+                val lastC = last.optString("c", "")
+                if (now - lastT < 5_000L && lastP == pkg && lastC == channelId) {
+                    return // 去重：不重复记录
+                }
+            }
+            val o = JSONObject()
+            o.put("t", now)
+            o.put("p", pkg)
+            o.put("c", channelId)
+            o.put("ti", title)
+            o.put("tx", text)
+            arr.put(o)
+            while (arr.length() > 300) arr.remove(0)
+            get(ctx).edit().putString("notif_history_v2", arr.toString()).apply()
+        } catch (t: Throwable) {
+        }
+    }
+
+    fun notifHistoryFull(ctx: Context): JSONArray {
+        val raw = get(ctx).getString("notif_history_v2", "[]") ?: "[]"
+        return try { JSONArray(raw) } catch (t: Throwable) { JSONArray() }
+    }
+
+    fun clearNotifHistoryFull(ctx: Context) {
+        get(ctx).edit().remove("notif_history_v2").apply()
+    }
+
+    // ---------- 通知关键词过滤（V3.4 新增） ----------
+
+    /** 按包名存储的过滤关键词列表，格式：pkg -> ["广告","推广"] */
+    fun notifFilterKeywords(ctx: Context, pkg: String): List<String> {
+        val raw = get(ctx).getString("notif_filter_keywords", "{}") ?: "{}"
+        return try {
+            val o = org.json.JSONObject(raw)
+            o.optJSONArray(pkg)?.let { arr ->
+                (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotBlank() }
+            } ?: emptyList()
+        } catch (t: Throwable) { emptyList() }
+    }
+
+    fun setNotifFilterKeywords(ctx: Context, pkg: String, keywords: List<String>) {
+        val raw = get(ctx).getString("notif_filter_keywords", "{}") ?: "{}"
+        try {
+            val o = org.json.JSONObject(raw)
+            if (keywords.isEmpty()) {
+                o.remove(pkg)
+            } else {
+                o.put(pkg, org.json.JSONArray(keywords))
+            }
+            get(ctx).edit().putString("notif_filter_keywords", o.toString()).apply()
+        } catch (t: Throwable) {}
+    }
+
+    /** 全局关键词过滤开关 */
+    fun notifFilterEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("notif_filter_enabled", false)
+
+    fun setNotifFilterEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("notif_filter_enabled", v).apply()
+    }
+
+    /** 检查通知标题/正文是否命中过滤关键词 */
+    fun notifMatchesFilter(ctx: Context, pkg: String, title: String, text: String): Boolean {
+        if (!notifFilterEnabled(ctx)) return false
+        val keywords = notifFilterKeywords(ctx, pkg)
+        if (keywords.isEmpty()) return false
+        val content = "$title $text"
+        return keywords.any { kw -> content.contains(kw, ignoreCase = true) }
+    }
+
+    // ---------- 无障碍权限锁定保活（应用级无障碍总控） ----------
+
+    /** 已锁定保活的无障碍服务组件串集合（被关闭后自动无感拉起）。 */
+    fun lockedAccessibilityServices(ctx: Context): Set<String> =
+        get(ctx).getStringSet("locked_accessibility", emptySet()) ?: emptySet()
+
+    fun setLockedAccessibilityServices(ctx: Context, v: Set<String>) {
+        get(ctx).edit().putStringSet("locked_accessibility", v.toSet()).apply()
+    }
+
+    fun isAccessibilityLocked(ctx: Context, componentFlat: String): Boolean =
+        componentFlat in lockedAccessibilityServices(ctx)
+
+    /** 开机启动保活集合：开机/系统重启后自动恢复这些无障碍服务（并入看门狗恢复）。 */
+    fun bootAccessibilityServices(ctx: Context): Set<String> =
+        get(ctx).getStringSet("boot_accessibility", emptySet()) ?: emptySet()
+
+    fun setBootAccessibilityServices(ctx: Context, v: Set<String>) {
+        get(ctx).edit().putStringSet("boot_accessibility", v.toSet()).apply()
+    }
+
+    fun isAccessibilityBoot(ctx: Context, componentFlat: String): Boolean =
+        componentFlat in bootAccessibilityServices(ctx)
+
+    // ---------- 保活提示（弹层全局选项） ----------
+
+    /** 保活拉起时是否显示 Toast 提示。 */
+    fun relaunchToastEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("relaunch_toast", false)
+
+    fun setRelaunchToastEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("relaunch_toast", v).apply()
+    }
+
+    /** 自定义保活提示文字；为空时使用默认文案。 */
+    fun relaunchToastText(ctx: Context): String? =
+        get(ctx).getString("relaunch_toast_text", null)
+
+    fun setRelaunchToastText(ctx: Context, v: String?) {
+        get(ctx).edit().putString("relaunch_toast_text", v?.takeIf { it.isNotBlank() }).apply()
+    }
+
+    /** 无障碍权限页：只显示用户应用。 */
+    fun accessPermUserOnly(ctx: Context): Boolean =
+        get(ctx).getBoolean("accessperm_user_only", false)
+
+    fun setAccessPermUserOnly(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("accessperm_user_only", v).apply()
+    }
+
+    // ---------- 实验 / 性能 ----------
+
+    /** 无障碍事件采样降频（毫秒）：窗口事件间隔小于该值时忽略，显著省电。 */
+    fun eventThrottleMs(ctx: Context): Long =
+        get(ctx).getLong("event_throttle", 300L)
+
+    fun setEventThrottleMs(ctx: Context, v: Long) {
+        get(ctx).edit().putLong("event_throttle", v.coerceIn(0L, 5_000L)).apply()
+    }
+
+    // ---------- 首次启动引导 ----------
+
+    /** 用户是否已完成首次授权引导（完成后不再自动弹出引导页）。 */
+    fun firstGuideDone(ctx: Context): Boolean =
+        get(ctx).getBoolean("first_guide_done", false)
+
+    fun setFirstGuideDone(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("first_guide_done", v).apply()
+    }
+
+    // ---------- 熄屏休眠省电模式 ----------
+
+    /** 熄屏后是否进入休眠模式（暂停保活巡检、降低自监控频率，亮屏恢复）。默认开。 */
+    fun dozeModeEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("doze_mode_enabled", true)
+
+    fun setDozeModeEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("doze_mode_enabled", v).apply()
+    }
+
+    /** 当前是否处于熄屏休眠状态（运行时标记，不持久化）。 */
+    @Volatile
+    private var dozeActive = false
+
+    fun isDozeActive(): Boolean = dozeActive
+
+    fun setDozeActive(v: Boolean) {
+        dozeActive = v
+    }
+
+    // ---------- 从最近应用列表隐藏 ----------
+
+    /** 是否从最近应用列表隐藏本应用（防止用户划走后台导致服务被杀）。默认关。 */
+    fun hideFromRecents(ctx: Context): Boolean =
+        get(ctx).getBoolean("hide_from_recents", false)
+
+    fun setHideFromRecents(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("hide_from_recents", v).apply()
+    }
+
+    // ---------- 用户主动关闭冷却期 ----------
+
+    /**
+     * 记录用户在本软件中主动关闭的无障碍服务（带时间戳），自监控在冷却期内不自动恢复，
+     * 避免用户想关闭被锁定服务时被立即拉起。冷却期默认 5 秒。
+     */
+    fun markUserDisabled(ctx: Context, flatten: String) {
+        get(ctx).edit().putLong("user_disabled_$flatten", System.currentTimeMillis()).apply()
+    }
+
+    /** 检查服务是否在用户主动关闭的冷却期内（默认 5 秒）。 */
+    fun isUserDisabledCooldown(ctx: Context, flatten: String, cooldownMs: Long = 5_000L): Boolean {
+        val t = get(ctx).getLong("user_disabled_$flatten", 0)
+        if (t == 0L) return false
+        if (System.currentTimeMillis() - t > cooldownMs) {
+            get(ctx).edit().remove("user_disabled_$flatten").apply()
+            return false
+        }
+        return true
+    }
+
+    // ---------- 自适应心跳与熔断 ----------
+
+    /** 低电量阈值（百分比），低于此值进入熔断模式。默认 15%。 */
+    fun lowBatteryThreshold(ctx: Context): Int =
+        get(ctx).getInt("low_battery_threshold", 15)
+
+    fun setLowBatteryThreshold(ctx: Context, v: Int) {
+        get(ctx).edit().putInt("low_battery_threshold", v.coerceIn(5, 50)).apply()
+    }
+
+    /** 低电量时是否完全暂停非必要保活（熔断模式）。默认开。 */
+    fun lowPowerSuspendEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("low_power_suspend_enabled", true)
+
+    fun setLowPowerSuspendEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("low_power_suspend_enabled", v).apply()
+    }
+
+    /**
+     * 用户手动锁定的心跳模式名称（HeartbeatMode.name）。
+     * null = 自动模式（跟随设备状态），默认。
+     */
+    fun manualHeartbeatMode(ctx: Context): String? =
+        get(ctx).getString("manual_heartbeat_mode", null)
+
+    fun setManualHeartbeatMode(ctx: Context, name: String?) {
+        get(ctx).edit().apply {
+            if (name == null) remove("manual_heartbeat_mode")
+            else putString("manual_heartbeat_mode", name)
+        }.apply()
+    }
+
+    // ---------- 隐私模式 ----------
+
+    /** 是否开启隐私模式（开启后暂停非必要屏幕内容读取）。默认关。 */
+    fun isPrivacyModeEnabled(ctx: Context): Boolean =
+        get(ctx).getBoolean("privacy_mode_enabled", false)
+
+    fun setPrivacyModeEnabled(ctx: Context, v: Boolean) {
+        get(ctx).edit().putBoolean("privacy_mode_enabled", v).apply()
+    }
+
+    // ---------- 今日统计（健康度仪表盘） ----------
+
+    private fun todayKey(suffix: String): String {
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        return "stat_${sdf.format(java.util.Date())}_$suffix"
+    }
+
+    /** 今日服务被杀次数。 */
+    fun todayKilledCount(ctx: Context): Int =
+        get(ctx).getInt(todayKey("killed"), 0)
+
+    fun bumpTodayKilled(ctx: Context) {
+        get(ctx).edit().putInt(todayKey("killed"), todayKilledCount(ctx) + 1).apply()
+    }
+
+    /** 今日服务成功拉起次数。 */
+    fun todayRestoredCount(ctx: Context): Int =
+        get(ctx).getInt(todayKey("restored"), 0)
+
+    fun bumpTodayRestored(ctx: Context) {
+        get(ctx).edit().putInt(todayKey("restored"), todayRestoredCount(ctx) + 1).apply()
+    }
+
+    /** 今日服务拉起失败次数。 */
+    fun todayRestoreFailedCount(ctx: Context): Int =
+        get(ctx).getInt(todayKey("restore_failed"), 0)
+
+    fun bumpTodayRestoreFailed(ctx: Context) {
+        get(ctx).edit().putInt(todayKey("restore_failed"), todayRestoreFailedCount(ctx) + 1).apply()
+    }
+
+    /** 清空今日统计数据。 */
+    fun clearTodayStats(ctx: Context) {
+        val keys = listOf("killed", "restored", "restore_failed")
+        val editor = get(ctx).edit()
+        keys.forEach { editor.remove(todayKey(it)) }
+        editor.apply()
+    }
+}

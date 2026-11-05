@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 通知拦截历史二级页工具栏菜单：清空全部 -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_clear_all"
+        android:icon="@drawable/ic_trash"
+        android:title="@string/notif_clear_all"
+        app:showAsAction="ifRoom" />
+</menu>

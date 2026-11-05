@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  本应用自带的无障碍服务（低耗电配置）：
+  - 只监听窗口切换类事件，不读取屏幕内容（canRetrieveWindowContent=false），省电且保护隐私
+  - 用途：①作为"自监控"目标（被系统/用户关闭后由 SelfGuardService 延迟 1 秒拉起）
+         ②事件驱动感知前台应用变化，为应用保活引擎提供"掉线"信号
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault"
+    android:canRetrieveWindowContent="false"
+    android:canPerformGestures="false"
+    android:description="@string/self_access_service_desc"
+    android:notificationTimeout="100"
+    android:settingsActivity="com.acsmanager.pro.ui.MainActivity" />

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 未锁定（空心锁）：重新绘制，几何中心严格居中于 24x24 viewport，适配圆形按钮 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="
+            M8,9.5V5a4,4 0 0 1 8,0V9.5H14V5a2,2 0 0 0 -4,0V9.5Z
+            M9,9.5V5.5a3,3 0 0 1 6,0V9.5H13V5.5a1,1 0 0 0 -2,0V9.5Z
+            M5.5,9.5h13a1.5,1.5 0 0 1 1.5,1.5v7a1.5,1.5 0 0 1 -1.5,1.5h-13a1.5,1.5 0 0 1 -1.5,-1.5v-7a1.5,1.5 0 0 1 1.5,-1.5z
+            M7,11h10v6.5H7z
+        " />
+</vector>

@@ -1,0 +1,244 @@
+package com.acsmanager.pro.ui
+
+import android.content.ComponentName
+import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.ServiceInfo
+import android.os.Bundle
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.acsmanager.pro.R
+import com.acsmanager.pro.core.Privilege
+import com.acsmanager.pro.databinding.ActivityServiceListBinding
+import com.acsmanager.pro.databinding.ItemServiceComponentBinding
+import com.acsmanager.pro.util.Prefs
+
+/**
+ * 二级页：展示某应用的全部可启动组件（Activity + Service），
+ * 允许单独勾选某一组件加入保活；勾选即时生效、取消即时失效。
+ *
+ * 启动按钮：
+ *  - Activity 有 LaunchIntent，直接 startActivity；
+ *  - Service 无 LaunchIntent：通过 Root / Shizuku 的 shell 执行 `am startservice` 拉起。
+ *    通道探测在后台线程做一次，列表绑定不触发 su 探测，避免滚动时反复 fork su。
+ */
+class ServiceListActivity : AppCompatActivity() {
+
+    companion object {
+        const val EXTRA_PACKAGE = "extra_package"
+    }
+
+    private lateinit var binding: ActivityServiceListBinding
+    private lateinit var pkg: String
+    private val adapter = ServiceAdapter()
+
+    /** 是否具备可执行 shell 的通道（Root / Shizuku），由后台探测回写。 */
+    @Volatile
+    private var shellAvailable = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityServiceListBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        pkg = intent.getStringExtra(EXTRA_PACKAGE) ?: run { finish(); return }
+
+        // 主题为 NoActionBar，必须用布局内的 MaterialToolbar 作为 ActionBar，
+        // 否则 supportActionBar 恒为 null——此前二级页没有标题栏/返回键，视觉上与首页突兀。
+        setSupportActionBar(binding.toolbar)
+        supportActionBar?.apply {
+            setDisplayHomeAsUpEnabled(true)
+            title = getString(R.string.svclist_title)
+            subtitle = pkg
+        }
+        binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
+
+        binding.recycler.layoutManager = LinearLayoutManager(this)
+        binding.recycler.adapter = adapter
+
+        val items = loadComponents()
+        if (items.isEmpty()) {
+            Toast.makeText(this, R.string.svclist_empty, Toast.LENGTH_SHORT).show()
+        }
+        adapter.submit(items)
+        probeShellChannel()
+    }
+
+    /** 后台探测 shell 通道，结果回主线程刷新按钮可见性。 */
+    private fun probeShellChannel() {
+        Thread {
+            val available = try {
+                Privilege.shellChannel(this) != Privilege.Channel.NONE
+            } catch (t: Throwable) {
+                false
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (available != shellAvailable) {
+                    shellAvailable = available
+                    adapter.notifyDataSetChanged()
+                }
+            }
+        }.apply {
+            isDaemon = true
+            name = "acs-svclist-probe"
+        }.start()
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        return true
+    }
+
+    internal data class CompItem(
+        val flat: String,          // ComponentName.flattenToString()
+        val shortName: String,      // 短类名（可读）
+        val typeLabel: String,      // "Activity" / "Service"
+        val launchIntent: Intent?,  // 有 LaunchIntent 才有；Service 通常为 null
+        val isService: Boolean
+    )
+
+    private fun loadComponents(): List<CompItem> {
+        val pm = packageManager
+        val out = mutableListOf<CompItem>()
+
+        // 1. 该包下所有可启动的 Activity（exported=true 且带 LAUNCHER category）
+        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val activities = try {
+            pm.queryIntentActivities(launcherIntent, 0)
+                .filter { it.activityInfo.packageName == pkg }
+                .map { it.activityInfo }
+        } catch (t: Throwable) { emptyList() }
+        for (ai in activities) {
+            val cn = ComponentName(ai.packageName, ai.name)
+            out.add(CompItem(
+                flat = cn.flattenToString(),
+                shortName = ai.name.substringAfterLast('.'),
+                typeLabel = getString(R.string.svclist_section_activity),
+                launchIntent = pm.getLaunchIntentForPackage(pkg),
+                isService = false
+            ))
+        }
+
+        // 2. 该包下所有 exported Service（用 queryIntentServices 拿不到非 MAIN intent 的，
+        //    直接通过 PackageManager 拿不到全部 Service，用 getPackageInfo + GET_SERVICES）
+        val services = try {
+            val info = pm.getPackageInfo(pkg, android.content.pm.PackageManager.GET_SERVICES)
+            info.services?.toList() ?: emptyList()
+        } catch (t: Throwable) { emptyList() }
+        for (si in services) {
+            if (si.exported == false) continue   // 只列 exported 的（否则拉不起来）
+            val cn = ComponentName(si.packageName, si.name)
+            out.add(CompItem(
+                flat = cn.flattenToString(),
+                shortName = si.name.substringAfterLast('.'),
+                typeLabel = getString(R.string.svclist_section_service),
+                launchIntent = null,
+                isService = true
+            ))
+        }
+        return out
+    }
+
+    inner class ServiceAdapter :
+        androidx.recyclerview.widget.RecyclerView.Adapter<ServiceAdapter.Holder>() {
+
+        private var items: List<CompItem> = emptyList()
+
+        internal fun submit(list: List<CompItem>) {
+            items = list
+            notifyDataSetChanged()
+        }
+
+        inner class Holder(val ib: ItemServiceComponentBinding) :
+            androidx.recyclerview.widget.RecyclerView.ViewHolder(ib.root) {
+
+            private var item: CompItem? = null
+
+            init {
+                ib.btnLaunch.setOnClickListener {
+                    val it = item ?: return@setOnClickListener
+                    launchComponent(it)
+                }
+                ib.cbProtect.setOnCheckedChangeListener { _, checked ->
+                    val it = item ?: return@setOnCheckedChangeListener
+                    val set = Prefs.keepAliveComponents(this@ServiceListActivity).toMutableSet()
+                    if (checked) set.add(it.flat) else set.remove(it.flat)
+                    Prefs.setKeepAliveComponents(this@ServiceListActivity, set)
+                    // 触发保活引擎重载目标
+                    com.acsmanager.pro.keepalive.KeepAliveEngine.reloadTargets(this@ServiceListActivity)
+                    Toast.makeText(
+                        this@ServiceListActivity,
+                        getString(
+                            if (checked) R.string.svclist_protected
+                            else R.string.svclist_not_protected
+                        ) + " · " + it.shortName,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+
+            internal fun bind(ci: CompItem) {
+                item = ci
+                ib.tvCompName.text = ci.shortName
+                ib.tvCompType.text = ci.typeLabel
+                ib.cbProtect.isChecked = Prefs.isComponentKept(this@ServiceListActivity, ci.flat)
+
+                // 启动按钮：有 LaunchIntent 直接显示；Service 只在有 shell 通道时显示
+                ib.btnLaunch.visibility =
+                    if (ci.launchIntent != null || shellAvailable) android.view.View.VISIBLE
+                    else android.view.View.GONE
+            }
+        }
+
+        override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): Holder =
+            Holder(ItemServiceComponentBinding.inflate(layoutInflater, parent, false))
+
+        override fun onBindViewHolder(holder: Holder, position: Int) =
+            holder.bind(items[position])
+
+        override fun getItemCount(): Int = items.size
+    }
+
+    /** 启动单个组件：Activity 用 startActivity；Service 用 Root/Shizuku shell 拉起。 */
+    private fun launchComponent(ci: CompItem) {
+        try {
+            ci.launchIntent?.let {
+                it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(it)
+                return
+            }
+            // Service：无普通启动权限，走 shell。命令必须离开主线程执行
+            // （su 授权框 / Shizuku 往返都可能阻塞数秒），且以真实输出判定成败。
+            val flat = ci.flat
+            Thread {
+                val ok = try {
+                    val fg = Privilege.execShell(this, "am", "start-foreground-service", "-n", flat)
+                    if (looksOk(fg)) true
+                    else looksOk(Privilege.execShell(this, "am", "startservice", "-n", flat))
+                } catch (t: Throwable) {
+                    false
+                }
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    Toast.makeText(
+                        this,
+                        if (ok) R.string.app_state_relaunched else R.string.app_state_relaunch_failed,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }.apply {
+                isDaemon = true
+                name = "acs-svclist-launch"
+            }.start()
+        } catch (t: Throwable) {
+            Toast.makeText(this, R.string.app_state_relaunch_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** `am` 成功时无输出；有输出且含 Error/Exception 视为失败。 */
+    private fun looksOk(out: String?): Boolean =
+        out != null && !out.contains("error", ignoreCase = true) &&
+            !out.contains("exception", ignoreCase = true)
+}
