@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>全部版本下载 · 无障碍管理器 Pro</title>
+<style>
+  :root{--bg:#0d1117;--card:#161b22;--border:#30363d;--fg:#e6edf3;--muted:#9198a1;
+        --accent:#4493f8;--accent-soft:#1f6feb22;--green:#3fb950;--radius:12px;
+        --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+  @media (prefers-color-scheme:light){
+    :root{--bg:#f6f8fa;--card:#fff;--border:#d0d7de;--fg:#1f2328;--muted:#59636e;
+          --accent:#0969da;--accent-soft:#0969da14;--green:#1a7f37}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);line-height:1.65;font-size:16px;
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans","PingFang SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 20px 72px}
+  .badge{display:inline-block;font-size:12px;font-weight:600;color:var(--accent);
+         background:var(--accent-soft);border-radius:999px;padding:3px 10px}
+  h1{font-size:26px;margin:12px 0 6px;letter-spacing:-.02em}
+  .sub{color:var(--muted);margin:0;font-size:14px}
+  .note{margin:20px 0 26px;padding:14px 16px;border:1px solid var(--border);border-left:3px solid var(--accent);
+        border-radius:8px;background:var(--card);font-size:13.5px;color:var(--muted)}
+  .note b{color:var(--fg)}
+  .toolbar{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px;font-size:13px;color:var(--muted)}
+  .toolbar a{color:var(--accent);text-decoration:none}
+  .list{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--card)}
+  .item{padding:16px 18px;border-top:1px solid var(--border)}
+  .item:first-child{border-top:none}
+  .item.newest{background:var(--accent-soft)}
+  .head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+  .vwrap{min-width:0}
+  .ver{font-family:var(--mono);font-weight:700;font-size:17px}
+  .latest{font-size:11px;font-weight:600;color:#fff;background:var(--green);
+          border-radius:999px;padding:1px 8px;margin-left:8px;vertical-align:2px}
+  .meta{color:var(--muted);font-size:12.5px;font-family:var(--mono);margin-top:3px}
+  .btn{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:#fff;
+       text-decoration:none;font-weight:600;font-size:13.5px;padding:8px 15px;border-radius:9px;white-space:nowrap}
+  .btn:hover{filter:brightness(1.08)}
+  .btn svg{width:15px;height:15px}
+  details{margin-top:12px}
+  summary{cursor:pointer;font-size:13px;color:var(--accent);list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary:before{content:"▸ ";display:inline-block;transition:transform .15s}
+  details[open] summary:before{content:"▾ "}
+  .notes{margin:10px 0 0;padding:12px 14px;border-radius:8px;background:var(--bg);
+         border:1px solid var(--border);font-size:13.5px;color:var(--muted)}
+  .notes ul{margin:6px 0 0;padding-left:20px}
+  .notes li{margin:3px 0}
+  .notes p{margin:6px 0}
+  .notes code{font-family:var(--mono);font-size:12.5px;background:var(--accent-soft);
+              border-radius:4px;padding:1px 5px;color:var(--fg)}
+  .empty{padding:22px 18px;color:var(--muted);font-size:14px}
+  footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+  footer a{color:var(--accent);text-decoration:none}
+  .back{margin-top:22px;font-size:13px}
+  .back a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="badge">安装包下载页</span>
+    <h1>无障碍管理器 Pro · 全部版本</h1>
+    <p class="sub">基于 Android 系统无障碍服务的管理器</p>
+  </header>
+
+  <div class="note">
+    <b>下载链接全部指向本备份仓库。</b>所有安装包已上传至 <code>rdtscx/AccessibilityManagerPro</code> 的 Releases，
+    页面内每个版本均使用本仓库地址，不使用上游项目的下载链接；上游仓库删除或改名不影响此处下载。
+  </div>
+
+  <div class="toolbar">
+    <span>共 1 个版本，按版本号从新到旧排列</span>
+    <a href="./">← 返回站点首页</a>
+  </div>
+
+  <div class="list">
+    <div class="item newest" id="v7.0.3">
+      <div class="head">
+        <div class="vwrap">
+          <div class="ver">v7.0.3<span class="latest">最新</span></div>
+          <div class="meta">2026-11-05 · 1.8 MB · AccessibilityManagerPro-v7.0.3.apk</div>
+        </div>
+        <a class="btn" href="https://github.com/rdtscx/AccessibilityManagerPro/releases/download/v7.0.3/AccessibilityManagerPro-v7.0.3.apk" download><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg><span>下载 v7.0.3</span></a>
+      </div>
+      <details><summary>更新记录</summary><div class="notes"><p><b>7.0.3 —— 首次引导命令改为三行</b></p>
+<ul>
+<li>引导页 ADB 命令改为三行独立命令：授予 <code>WRITE_SECURE_SETTINGS</code>、打开自由窗口支持、授予音量键长按监听</li>
+<li>清单补声明 <code>SET_VOLUME_KEY_LONG_PRESS_LISTENER</code>（未声明时 <code>pm grant</code> 会直接报错）</li>
+<li>新增「一键执行（Root / Shizuku）」按钮：可在应用内按顺序执行同一组命令，失败回显该行真实输出</li>
+<li>展示、复制、应用内执行共用同一份命令定义</li>
+</ul>
+<p>安装提示：本包使用新的签名密钥，若设备上装过旧版本，需先卸载再安装。</p></div></details>
+    </div></div>
+
+  <footer>
+    <div>安装包文件：AccessibilityManagerPro-v7.0.3.apk</div>
+    <div>备份仓库：<a href="https://github.com/rdtscx/AccessibilityManagerPro">rdtscx/AccessibilityManagerPro</a></div>
+    <div class="back"><a href="./">返回站点首页</a></div>
+  </footer>
+</div>
+</body>
+</html>
