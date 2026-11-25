@@ -1,0 +1,39 @@
+name: refresh-downloads
+
+# 每天 08:00 / 20:00（北京时间 = UTC+8）按本仓库最新 Release 重建下载页
+on:
+  schedule:
+    - cron: "0 0 * * *"
+    - cron: "0 12 * * *"
+  release:
+    types: [published, edited, deleted]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-downloads
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rebuild downloads.html
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "backup-bot"
+          git config user.email "backup-bot@users.noreply.github.com"
+          python3 scripts/build_downloads.py
+          git add downloads.html
+          if git diff --cached --quiet; then
+            echo "下载页无变化"
+          else
+            git commit -m "chore: 按最新 Release 重建下载页 $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push origin HEAD:main
+          fi
