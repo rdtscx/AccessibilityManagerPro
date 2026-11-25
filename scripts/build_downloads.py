@@ -150,7 +150,7 @@ def build(repo, app):
         files = ''.join(chip(a) for a in sorted(r['assets'], key=lambda a: a['name']))
         notes = notes_html(r['body'], repo, r['tag'])
         size = fmt_size(sum(a.get('size', 0) for a in r['assets']))
-        heading = ('<span class="dlx-left"><span class="dlx-ver">%s</span>%s<span class="dlx-date">%s</span></span>'
+        heading = ('<span class="dlx-left"><span class="dlx-ver">%s</span>%s<span class="dlx-date" title="本站收录该版本的时间">收录 %s</span></span>'
                    '<span class="dlx-right">%d 个文件 · %s<span class="dlx-arrow"></span></span>') % (
             H.escape(r['tag']), '<span class="dlx-badge">最新</span>' if i == 0 else '', (r['date'] or '')[:10],
             len(r['assets']), size)
