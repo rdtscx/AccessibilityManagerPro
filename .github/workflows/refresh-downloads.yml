@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Rebuild downloads.html
+      - name: 刷新映射页页尾下载区
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
