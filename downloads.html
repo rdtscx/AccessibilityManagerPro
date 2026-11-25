@@ -40,9 +40,9 @@
   .btn:hover{filter:brightness(1.08)}
   .btn svg{width:15px;height:15px}
   details{margin-top:12px}
-  summary{cursor:pointer;font-size:13px;color:var(--accent);list-style:none}
+  summary{cursor:pointer;font-size:13px;color:var(--accent);list-style:none}summary span{padding-left:2px}
   summary::-webkit-details-marker{display:none}
-  summary:before{content:"▸ ";display:inline-block;transition:transform .15s}
+  summary{display:inline-flex;align-items:center}summary:before{content:"▸";margin-right:5px;display:inline-block}
   details[open] summary:before{content:"▾ "}
   .notes{margin:10px 0 0;padding:12px 14px;border-radius:8px;background:var(--bg);
          border:1px solid var(--border);font-size:13.5px;color:var(--muted)}
@@ -96,7 +96,7 @@
     </div></div>
 
   <footer>
-    <div>安装包文件：AccessibilityManagerPro-v7.0.3.apk</div>
+    <div>安装包：共 1 个文件，全部托管于本仓库 Releases，未使用上游下载地址。</div>
     <div>备份仓库：<a href="https://github.com/rdtscx/AccessibilityManagerPro">rdtscx/AccessibilityManagerPro</a></div>
     <div class="back"><a href="./">返回站点首页</a></div>
   </footer>
