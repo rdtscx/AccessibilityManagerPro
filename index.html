@@ -1317,8 +1317,65 @@ pm grant com.acsmanager.pro android.permission.SET_VOLUME_KEY_LONG_PRESS_LISTENE
 </p>
 </div>
 </main>
+<!-- DLX:START -->
+<style>
+.dlx{margin:34px 0 8px;color:var(--dlx-text,#1e2733)}
+.dlx *{box-sizing:border-box}
+.dlx-head{display:flex;align-items:baseline;gap:9px;margin:0 0 10px}
+.dlx-head h2{margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em;color:inherit}
+.dlx-head .dlx-count{font-size:11px;color:#8d97a5;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.dlx-note{margin:0 0 14px;font-size:12px;color:#5f6b7a}
+.dlx-list{border:1px solid var(--dlx-line,#e6e9ef);border-radius:12px;overflow:hidden;
+  background:var(--dlx-panel,#fff);box-shadow:0 1px 2px rgba(31,45,66,.03)}
+.dlx-item{border-top:1px solid var(--dlx-line2,#eef1f5);animation:dlxRise .34s cubic-bezier(.22,.9,.3,1) both;
+  animation-delay:calc(var(--i,0) * 24ms)}
+.dlx-item:first-child{border-top:0}
+.dlx-sum{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 16px;
+  cursor:pointer;list-style:none;transition:background .16s}
+.dlx-sum::-webkit-details-marker{display:none}
+.dlx-sum:hover{background:var(--dlx-panel2,#fbfcfd)}
+.dlx-left{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.dlx-ver{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;font-weight:700;color:inherit}
+.dlx-badge{font-size:9.5px;font-weight:600;color:#3f6fd8;background:#eef3fd;border-radius:999px;padding:1px 7px;white-space:nowrap}
+.dlx-date{font-size:11px;color:#8d97a5;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.dlx-right{display:flex;align-items:center;gap:10px;flex-shrink:0;font-size:11px;color:#8d97a5}
+.dlx-arrow{width:6px;height:6px;border-top:1.5px solid #8d97a5;border-right:1.5px solid #8d97a5;
+  transform:rotate(45deg);transition:transform .2s}
+details[open] .dlx-arrow{transform:rotate(135deg)}
+.dlx-files{display:flex;flex-wrap:wrap;gap:6px;padding:2px 16px 14px}
+.dlx-f{display:inline-flex;flex-direction:column;gap:1px;max-width:280px;text-decoration:none;
+  border:1px solid var(--dlx-line,#e6e9ef);border-radius:8px;padding:5px 9px;background:#fff;
+  transition:border-color .15s,background .15s,transform .12s}
+.dlx-f:hover{border-color:#3f6fd8;background:#eef3fd;transform:translateY(-1px)}
+.dlx-f b{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10.5px;font-weight:600;
+  color:#1e2733;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.dlx-f span{font-size:10px;color:#8d97a5}
+.dlx-foot{margin-top:12px;font-size:11px;color:#8d97a5}
+.dlx-foot a{color:#3f6fd8;text-decoration:none}
+@media (prefers-color-scheme:dark){
+  .dlx{--dlx-text:#e6ebf2;--dlx-panel:#151b23;--dlx-panel2:#1a212b;--dlx-line:#232b36;--dlx-line2:#1e2631}
+  .dlx-head h2{color:#e6ebf2}
+  .dlx .dlx-ver{color:#e6ebf2}
+  .dlx-f{background:#1a212b;border-color:#232b36}
+  .dlx-f:hover{background:#1f2a3d;border-color:#7aa2f7}
+  .dlx-f b{color:#e6ebf2}
+  .dlx-badge{color:#7aa2f7;background:rgba(122,162,247,.14)}
+  .dlx-foot a,.dlx-f:hover b{color:#7aa2f7}
+  .dlx-note,.dlx-date,.dlx-right,.dlx-foot{color:#9aa7b8}
+}
+@keyframes dlxRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.dlx-item{animation:none!important}}
+</style>
+
+<div class="dlx" id="download">
+  <div class="dlx-head"><h2>下载</h2><span class="dlx-count">1 个版本 · 1 个文件</span></div>
+  <p class="dlx-note">下面的安装包全部托管在本仓库 Releases：按版本排列，最新版本默认展开。</p>
+  <div class="dlx-list"><div class="dlx-item" style="--i:0"><div class="dlx-sum"><span class="dlx-left"><span class="dlx-ver">v7.0.3</span><span class="dlx-badge">最新</span><span class="dlx-date">2026-11-05</span></span><span class="dlx-right">1 个文件 · 1.8 MB<span class="dlx-arrow"></span></span></div><div class="dlx-files"><a class="dlx-f" href="https://github.com/rdtscx/AccessibilityManagerPro/releases/download/v7.0.3/AccessibilityManagerPro-v7.0.3.apk" download title="AccessibilityManagerPro-v7.0.3.apk"><b>AccessibilityManagerPro-v7.0.3.apk</b><span>1.8 MB</span></a></div></div></div>
+  <p class="dlx-foot">仓库：<a href="https://github.com/rdtscx/AccessibilityManagerPro">rdtscx/AccessibilityManagerPro</a></p>
+</div>
+<!-- DLX:END -->
 <footer class="page-footer">
-  <p style="margin:0 0 10px"><a href="downloads.html">全部版本下载页 →</a></p>
+
   <a href="https://github.com/rdtscx/AccessibilityManagerPro">在 GitHub 上查看 rdtscx/AccessibilityManagerPro</a>
 </footer>
 </body>

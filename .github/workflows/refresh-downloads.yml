@@ -30,10 +30,10 @@ jobs:
           git config user.name "backup-bot"
           git config user.email "backup-bot@users.noreply.github.com"
           python3 scripts/build_downloads.py
-          git add downloads.html
+          git add index.html
           if git diff --cached --quiet; then
-            echo "下载页无变化"
+            echo "下载区块无变化"
           else
-            git commit -m "chore: 按最新 Release 重建下载页 $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git commit -m "chore: 按最新 Release 重建页尾下载区块 $(date -u '+%Y-%m-%d %H:%M UTC')"
             git push origin HEAD:main
           fi
