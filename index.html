@@ -1365,12 +1365,19 @@ details[open] .dlx-arrow{transform:rotate(135deg)}
 }
 @keyframes dlxRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.dlx-item{animation:none!important}}
+.dlx-notes{margin:0 16px 12px;padding:10px 12px;border-left:2px solid #3f6fd8;background:var(--dlx-panel2,#fbfcfd);
+  border-radius:0 8px 8px 0;font-size:12px;line-height:1.7;color:#5f6b7a;white-space:pre-wrap}
+.dlx-notes span{display:block;margin-top:6px;font-size:11px}
+@media (prefers-color-scheme:dark){.dlx-notes{background:#1a212b;color:#9aa7b8}}
 </style>
 
 <div class="dlx" id="download">
   <div class="dlx-head"><h2>下载</h2><span class="dlx-count">1 个版本 · 1 个文件</span></div>
   <p class="dlx-note">下面的安装包全部托管在本仓库 Releases：按版本排列，最新版本默认展开。</p>
-  <div class="dlx-list"><div class="dlx-item" style="--i:0"><div class="dlx-sum"><span class="dlx-left"><span class="dlx-ver">v7.0.3</span><span class="dlx-badge">最新</span><span class="dlx-date">2026-11-05</span></span><span class="dlx-right">1 个文件 · 1.8 MB<span class="dlx-arrow"></span></span></div><div class="dlx-files"><a class="dlx-f" href="https://github.com/rdtscx/AccessibilityManagerPro/releases/download/v7.0.3/AccessibilityManagerPro-v7.0.3.apk" download title="AccessibilityManagerPro-v7.0.3.apk"><b>AccessibilityManagerPro-v7.0.3.apk</b><span>1.8 MB</span></a></div></div></div>
+  <div class="dlx-list"><div class="dlx-item" style="--i:0"><div class="dlx-sum"><span class="dlx-left"><span class="dlx-ver">v7.0.3</span><span class="dlx-badge">最新</span><span class="dlx-date">2026-11-05</span></span><span class="dlx-right">1 个文件 · 1.8 MB<span class="dlx-arrow"></span></span></div><div class="dlx-files"><a class="dlx-f" href="https://github.com/rdtscx/AccessibilityManagerPro/releases/download/v7.0.3/AccessibilityManagerPro-v7.0.3.apk" download title="AccessibilityManagerPro-v7.0.3.apk"><b>AccessibilityManagerPro-v7.0.3.apk</b><span>1.8 MB</span></a></div><div class="dlx-notes">7.0.3 —— 首次引导命令改为三行
+· 引导页 ADB 命令改为三行独立命令：授予 WRITE_SECURE_SETTINGS、打开自由窗口支持、授予音量键长按监听
+· 清单补声明 SET_VOLUME_KEY_LONG_PRESS_LISTENER（未声明时 pm grant 会直接报错）
+· 新增「一键执行（Root / Shizuku）」按钮：可在应用内按顺序执行同一组命令，失败回显该行真实输出<span>完整更新记录见 <a href="https://github.com/AccessibilityManagerPro/releases/tag/v7.0.3">本仓库 Release</a></span></div></div></div>
   <p class="dlx-foot">仓库：<a href="https://github.com/rdtscx/AccessibilityManagerPro">rdtscx/AccessibilityManagerPro</a></p>
 </div>
 <!-- DLX:END -->

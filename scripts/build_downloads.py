@@ -59,8 +59,26 @@ details[open] .dlx-arrow{transform:rotate(135deg)}
 }
 @keyframes dlxRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.dlx-item{animation:none!important}}
+.dlx-notes{margin:0 16px 12px;padding:10px 12px;border-left:2px solid #3f6fd8;background:var(--dlx-panel2,#fbfcfd);
+  border-radius:0 8px 8px 0;font-size:12px;line-height:1.7;color:#5f6b7a;white-space:pre-wrap}
+.dlx-notes span{display:block;margin-top:6px;font-size:11px}
+@media (prefers-color-scheme:dark){.dlx-notes{background:#1a212b;color:#9aa7b8}}
 </style>
 """
+
+
+def short_label(name):
+    """把 fcitx 的 APK 名压成 主程序/插件 + ABI；插件本身不分 ABI。"""
+    m = re.match(r'org\.fcitx\.fcitx5\.android(?:\.plugin\.([a-z0-9_\-]+?))?-\d', name)
+    if not m:
+        return name
+    base = (m.group(1) or '主程序').replace('_', '-')
+    abi = ''
+    for a in ('arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'):
+        if ('-' + a + '-release') in name:
+            abi = a
+            break
+    return '%s · %s' % (base, abi) if abi else base
 
 
 def fmt_size(b):
@@ -86,15 +104,51 @@ def releases(repo):
     return out
 
 
+CSS_NOTE = """
+.dlx-notes{margin:0 16px 12px;padding:10px 12px;border-left:2px solid #3f6fd8;background:var(--dlx-panel2,#fbfcfd);
+  border-radius:0 8px 8px 0;font-size:12px;line-height:1.7;color:#5f6b7a;white-space:pre-wrap}
+.dlx-notes span{display:block;margin-top:6px;font-size:11px}
+@media (prefers-color-scheme:dark){.dlx-notes{background:#1a212b;color:#9aa7b8}}
+"""
+
+
+def notes_html(body, repo, tag):
+    if not body:
+        return ''
+    lines = []
+    for raw in body.splitlines():
+        t = raw.strip()
+        if not t or t.startswith('![') or t.startswith('|') or t.startswith('---'):
+            continue
+        t = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', t)
+        t = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', t)
+        t = re.sub(r'^#+\s*', '', t)
+        t = re.sub(r'^[*+-]\s*', '· ', t)
+        t = t.replace('**', '').replace('`', '')
+        if t.strip():
+            lines.append(t.strip())
+        if len(lines) >= 4:
+            break
+    if not lines:
+        return ''
+    text = '\n'.join(lines)
+    if len(text) > 420:
+        text = text[:420] + '…'
+    return '<div class="dlx-notes">%s<span>完整更新记录见 <a href="https://github.com/%s/releases/tag/%s">本仓库 Release</a></span></div>' % (
+        H.escape(text), repo, H.escape(tag))
+
+
 def build(repo, app):
     rels = releases(repo)
     total_files = sum(len(r['assets']) for r in rels)
     items = []
     for i, r in enumerate(rels):
-        files = ''.join(
-            '<a class="dlx-f" href="%s" download title="%s"><b>%s</b><span>%s</span></a>' % (
-                a['browser_download_url'], H.escape(a['name']), H.escape(a['name']), fmt_size(a.get('size')))
-            for a in sorted(r['assets'], key=lambda a: a['name']))
+        def chip(a):
+            label = short_label(a['name']) if app['group'] else a['name']
+            return ('<a class="dlx-f" href="%s" download title="%s"><b>%s</b><span>%s</span></a>' % (
+                a['browser_download_url'], H.escape(a['name']), H.escape(label), fmt_size(a.get('size'))))
+        files = ''.join(chip(a) for a in sorted(r['assets'], key=lambda a: a['name']))
+        notes = notes_html(r['body'], repo, r['tag'])
         size = fmt_size(sum(a.get('size', 0) for a in r['assets']))
         heading = ('<span class="dlx-left"><span class="dlx-ver">%s</span>%s<span class="dlx-date">%s</span></span>'
                    '<span class="dlx-right">%d 个文件 · %s<span class="dlx-arrow"></span></span>') % (
@@ -102,10 +156,10 @@ def build(repo, app):
             len(r['assets']), size)
         if i == 0:
             items.append('<div class="dlx-item" style="--i:0"><div class="dlx-sum">%s</div>'
-                         '<div class="dlx-files">%s</div></div>' % (heading, files))
+                         '<div class="dlx-files">%s</div>%s</div>' % (heading, files, notes))
         else:
             items.append('<details class="dlx-item" style="--i:%d"><summary class="dlx-sum">%s</summary>'
-                         '<div class="dlx-files">%s</div></details>' % (i, heading, files))
+                         '<div class="dlx-files">%s</div>%s</details>' % (i, heading, files, notes))
 
     notice = ('下面的文件全部托管在本仓库 Releases：主程序与各语言插件 APK 按版本排列，最新版本默认展开。'
               if app['group'] else '下面的安装包全部托管在本仓库 Releases：按版本排列，最新版本默认展开。')
